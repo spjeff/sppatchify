@@ -1,6 +1,9 @@
+# Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 Function CopyEXE() {
+	Write-Host "===== CopyEXE =====" -Fore Yellow
+
 	# Loop servers
 	$counter = 0
 	foreach ($server in $servers) {
@@ -25,6 +28,8 @@ Function CopyEXE() {
 }
 
 Function StartEXE() {
+	Write-Host "===== StartEXE =====" -Fore Yellow
+	
 	# Build CMD
 	$files = Get-ChildItem ".\media\*.exe"
 	if ($files -is [System.Array]) {
@@ -37,6 +42,8 @@ Function StartEXE() {
 }
 
 Function WaitReboot() {
+	Write-Host "===== WaitReboot =====" -Fore Yellow
+	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
 	Sleep 30
@@ -57,7 +64,71 @@ Function WaitReboot() {
 	Get-PSSession | Remove-PSSession
 }
 
+Function LoopRemoteCmd($msg, $cmd) {
+	# Loop servers
+	$counter = 0
+	foreach ($server in $servers) {
+		# Script block
+		if ($cmd.GetType().Name -eq "String") {
+			if ($env:computername -eq $server.Address) {
+				$cmd = $cmd -replace "forcerestart","norestart"
+			}
+			$sb = [ScriptBlock]::Create("$cmd")
+		} else {
+			$sb = $cmd
+		}
+	
+		# Progress
+		$addr = $server.Address
+		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
+		$counter++
+		
+		# Remote Posh
+		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
+		Write-Host ">> invoke on $addr" -Fore Green
+		$sb.ToString()
+		Invoke-Command -Session $remote -ScriptBlock $sb
+		Write-Host "<< complete on $addr" -Fore Green
+	}
+	Get-PSSession | Remove-PSSession
+	Write-Progress -Activity "Completed" -Completed	
+}
+
+Function ChangeDC() {
+	Write-Host "===== ChangeDC OFF =====" -Fore Yellow
+
+	# Distributed Cache
+	$sb = {
+		Use-CacheCluster
+		Get-AFCacheClusterHealth -ErrorAction SilentlyContinue
+		$computer = [System.Net.Dns]::GetHostByName($env:computername).HostName
+		$counter = 0
+		$maxLoops = 60
+		
+		$cache = Get-CacheHost |? {$_.HostName -eq $computer}
+		if ($cache) {
+			do {
+				try {
+				# Wait for graceful stop
+				$hostInfo = Stop-CacheHost -Graceful -CachePort 22233 -HostName $computer -ErrorAction SilentlyContinue
+				Write-Host $computer $hostInfo.Status
+				Sleep 5
+				$counter++
+				} catch {break}
+			} while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
+			
+			# Force stop
+			Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+			Stop-SPDistributedCacheServiceInstance
+		}
+	}
+	LoopRemoteCmd "Stop Distributed Cache on " $sb
+}
+
 Function ChangeServices($state) {
+	Write-Host "===== ChangeServices $state =====" -Fore Yellow
+	
 	# Logic core
 	if ($state) {
 		$action = "START"
@@ -91,12 +162,14 @@ Function ChangeServices($state) {
 	
 	# Search Crawler
 	Write-Host "$action search crawler ..."
-	$ssa = get-spenterprisesearchserviceapplication 
-	if ($state) {
-		$ssa.resume()
-	} else {
-		$ssa.pause()
-	}
+	try {
+		$ssa = Get-SPEenterpriseSearchServiceApplication 
+		if ($state) {
+			$ssa.resume()
+		} else {
+			$ssa.pause()
+		}
+	} catch {}
 	
 	LoopRemoteCmd "$action services on " $scriptBlock
 }
@@ -104,46 +177,13 @@ Function ChangeServices($state) {
 Function RunConfigWizard() {
 	# Build CMD
 	$ver = (Get-SPFarm).BuildVersion.Major;
-	#REM $configWizard = """C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\BIN\psconfig.exe"" -cmd upgrade -inplace b2b -wait -cmd applicationcontent -install -cmd installfeatures -cmd secureresources}"
 	$configWizard = "& 'C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\BIN\psconfig.exe' -cmd upgrade -inplace b2b -wait"
-	#REM $configWizard = "C:\Progra~1\Common~1\micro~1\Web Server Extensions\$ver\BIN\psconfig.exe -cmd upgrade -inplace b2b -wait"
 	LoopRemoteCmd "Run Config Wizard on " $configWizard
 }
 
-Function LoopRemoteCmd($msg, $cmd) {
-
-
-	# Loop servers
-	$counter = 0
-	foreach ($server in $servers) {
-		# Script block
-		if ($cmd.GetType().Name -eq "String") {
-			if ($env:computername -eq $server.Address) {
-				$cmd = $cmd -replace "forcerestart","norestart"
-			}
-			$sb = [ScriptBlock]::Create("$cmd")
-		} else {
-			$sb = $cmd
-		}
-	
-		# Progress
-		$addr = $server.Address
-		$prct =  [Math]::Round(($counter/$servers.Count)*100)
-		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
-		$counter++
-		
-		# Remote Posh
-		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
-		Write-Host ">> invoke on $addr" -Fore Green
-		$sb.ToString()
-		Invoke-Command -Session $remote -ScriptBlock $sb
-		Write-Host "<< complete on $addr" -Fore Green
-	}
-	Get-PSSession | Remove-PSSession
-	Write-Progress -Activity "Completed" -Completed	
-}
-
 Function ChangeContent($state) {
+	Write-Host "===== ContentDB $state =====" -Fore Yellow
+
 	if (!$state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
@@ -175,6 +215,8 @@ Function ChangeContent($state) {
 }
 
 Function ReadIISPW {
+	Write-Host "===== Read IIS PW =====" -Fore Yellow
+
 	# Current user (ex: Farm Account)
 	$domain = $env:userdomain
 	$user = $env:username
@@ -202,44 +244,31 @@ Function ReadIISPW {
 }
 
 Function Main() {
-	# Transcript and start time
+	# Start time
+	Start-Transcript
+	$start = Get-Date
 
 	# Local farm scope
 	$servers = Get-SPServer |? {$_.Role -ne "Invalid"}
 	$when = (Get-Date).ToString("yyyy-MM-dd-hh-mm-ss")
 	
-	# Steps
-	Write-Host "===== Read IIS PW =====" -Fore Yellow
-	ReadIISPW
-	
-	# Steps
-	Write-Host "===== CopyEXE =====" -Fore Yellow
+	# Core steps
+ 	ReadIISPW
 	CopyEXE
-	
-	Write-Host "===== ChangeServices OFF =====" -Fore Yellow
+	ChangeDC
 	ChangeServices $false
-	
-	Write-Host "===== StartEXE =====" -Fore Yellow
 	StartEXE
-	
-	Write-Host "===== WaitReboot =====" -Fore Yellow
 	WaitReboot
-	
-	Write-Host "===== ContentDB OFF =====" -Fore Yellow
 	ChangeContent $false
-	
-	Write-Host "===== RunConfigWizard =====" -Fore Yellow
+	ChangeServices $true
 	RunConfigWizard
-	
-	Write-Host "===== ContentDB ON =====" -Fore Yellow
 	ChangeContent $true
 	
-	Write-Host "===== ChangeServices ON =====" -Fore Yellow
-	ChangeServices $true
-	
+	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
-	
-	# Run duration time
+	$th = [Math]::Round(((Get-Date) - $start).TotalHours,2)
+	Write-Host "Duration Total Hours: $th" -Fore Yellow
+	Stop-Transcript
 }
 
 Main
