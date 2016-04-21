@@ -1,8 +1,25 @@
 ## Description
 SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console
 
+## Business Challenge
+* Long downtime
+* Late staff hours
+* Inconsistent procedures
+
+## Technical Solution
+* Auto detect farm
+* Copy EXE to all servers
+* Stop SharePoint services
+* Run EXE in parallel
+* Wait for all EXE and reboots to complete
+* Run Config Wizard
+* Start SharePoint services
+* Display Central Admin
+
 ## Screenshots
 ![image](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/1.png)
+![image](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/2.png)
+![image](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/3.png)
 
 ## Contact
 Please drop a line to [@spjeff](https://twitter.com/spjeff) or [spjeff@spjeff.com](mailto:spjeff@spjeff.com)
