@@ -1,3 +1,21 @@
+<#
+.SYNOPSIS
+	SharePoint Central Admin - View active services across entire farm. No more select machine drop down dance!
+.DESCRIPTION
+	Apply CU patch to entire farm from one PowerShell console.
+	
+	NOTE - must run local to a SharePoint server under account with farm admin rights.
+
+	Comments and suggestions always welcome!  spjeff@spjeff.com or @spjeff
+.NOTES
+	File Name		: SPPatchify.ps1
+	Author			: Jeff Jones - @spjeff
+	Version			: 0.1
+	Last Modified	: 04-21-2015
+.LINK
+	http://www.github.com/spjeff/sppatchify
+#>
+
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
