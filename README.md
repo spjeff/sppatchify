@@ -1,6 +1,8 @@
 ## Description
 SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console. SWEET!!
 
+[![](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/download.png)](https://github.com/spjeff/sppatchify/releases/download/SPPatchify/SPPatchify.zip)
+
 ## Business Challenge
 * Long downtime
 * Late staff hours
