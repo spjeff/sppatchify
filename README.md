@@ -1,5 +1,5 @@
 ## Description
-SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console
+SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console. SWEET!!
 
 ## Business Challenge
 * Long downtime
@@ -7,6 +7,7 @@ SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console
 * Inconsistent procedures
 
 ## Technical Solution
+* Supports SharePoint 2010, 2013, and 2016
 * Auto detect farm
 * Copy EXE to all servers
 * Stop SharePoint services
