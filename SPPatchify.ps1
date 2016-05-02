@@ -18,6 +18,7 @@
 	
 	Patch Notes
 	http://www.toddklindt.com/blog/Lists/Posts/Post.aspx?ID=346
+	http://sharepointupdates.com
 #>
 
 # Plugin
@@ -241,7 +242,7 @@ Function RunConfigWizard() {
 	# Shared
 	$shared = {
 		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
-		$ver = (Get-SPFarm).BuildVersion.Major;
+		$ver = (Get-SPFarm).BuildVersion.Major
 		$psconfig = "C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\BIN\psconfig.exe"
 		$options = "-cmd upgrade -inplace b2b -wait -cmd applicationcontent -install -cmd installfeatures -cmd secureresources"
 	}
@@ -299,7 +300,7 @@ Function ChangeContent($state) {
 #region general
 Function EnablePS() {
 	$ssp = Get-WSManCredSSP
-	if ($ssp[0] -eq "The machine is not configured to allow delegating fresh credentials.") {
+	if ($ssp[0] -match "not configured to allow delegating") {
 		# Enable remote PowerShell over CredSSP authentication
 		Enable-WSManCredSSP -DelegateComputer * -Role Client -Force
 		Restart-Service WinRM
@@ -338,7 +339,7 @@ Function ReadIISPW {
 Function DisplayCA() {
 	# version table
 	(Get-SPFarm).BuildVersion
-	$ver = (Get-SPFarm).BuildVersion.Major;
+	$ver = (Get-SPFarm).BuildVersion.Major
 	
 	$sb = {
 		[System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion,@{N='PC'; E={$env:computername}}
@@ -352,12 +353,76 @@ Function DisplayCA() {
 }
 
 Function IISStart() {
+	# start IIS pools and sites
 	$sb = {
 		net start w3svc
 		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n}
 		Get-WebSite | Start-WebSite
 	}
 	LoopRemoteCmd "Start IIS on " $sb
+}
+
+Function RebootLocal() {
+	# reboot local machine
+	Write-Host "Local machine needs to reboot"
+	Write-Host "Type YES to continue"  -Fore Yellow
+	$p = Read-Host
+	if ($p -eq "YES") {
+		Write-Host "Rebooting ... "
+		Restart-Computer -Delay 10 -Force
+	} else {
+		Write-Host "Reboot cancelled"
+	}
+}
+
+Function PatchMenu() {
+	# PatchMenu
+	$csv = Import-Csv "SPPatchify.csv"
+	cls
+	Write-Host "================ CHOOSE CU PATCH MONTH ================"
+	Write-Host "L: Press 'L' for the latest patch (Apr 2016)"
+	Write-Host ""
+	Write-Host "1: Press '1' for Jan 2016"
+	Write-Host "2: Press '2' for Feb 2016"
+	Write-Host "3: Press '3' for Mar 2016"
+	Write-Host "4: Press '4' for Apr 2016"
+	$input = Read-Host "Please make a selection"
+	switch ($input) {
+		'L' {
+			$input = '4'
+		}
+	}
+	if (Get-Command Get-SPProjectWebInstance) {
+		$sku = "PROJ"
+	} else {
+		$sku = "SP"
+	}
+	$patchFiles = $csv |? {$_.Year -eq '2016' -and $_.Month -eq $input -and $_.Product -eq "$sku$ver"}
+
+
+	# PatchDownload
+	$bits = (Get-Command Start-BitsTransfer)
+	foreach ($file in $patchFiles) {
+		# Parameters
+		$splits = $file.URL.Split("/")
+		$name = $splits[$splits.Count - 1]
+		$dest = "C:\SPPatchify\media\$name"
+
+		if (Test-Path $dest) {
+			Write-Host "Found $name"
+		} else {
+			Write-Host "Downloading $name"
+			if ($bits) {
+				# pefer BITS
+				 Write-Host "BITS $dest"
+				Start-BitsTransfer -Source $file.URL -Destination $dest
+			} else {
+				# Dot Net
+				Write-Host "WebClient $dest"
+				(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
+			}
+		}
+	}
 }
 #endregion
 
@@ -371,8 +436,9 @@ Function Main() {
 	# Local farm
 	(Get-SPFarm).BuildVersion
 	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
-	
+
 	# Core steps
+	PatchMenu
 	EnablePS
  	ReadIISPW
 	CopyEXE "Copy"
@@ -388,22 +454,12 @@ Function Main() {
 	CopyEXE "Remove"
 	IISStart
 	DisplayCA
+	RebootLocal
 	
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours,2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
-	
-	# Reboot local
-	Write-Host "Local machine needs to reboot"
-	Write-Host "Type YES to continue"  -Fore Yellow
-	$p = Read-Host
-	if ($p -eq "YES") {
-		Write-Host "Rebooting ... "
-		Restart-Computer -Delay 10 -Force
-	} else {
-		Write-Host "Reboot cancelled"
-	}
 	Stop-Transcript
 }
 
