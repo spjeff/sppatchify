@@ -10,10 +10,14 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.1
-	Last Modified	: 04-21-2015
+	Version			: 0.2
+	Last Modified	: 05-02-2015
 .LINK
+	Source Code
 	http://www.github.com/spjeff/sppatchify
+	
+	Patch Notes
+	http://www.toddklindt.com/blog/Lists/Posts/Post.aspx?ID=346
 #>
 
 # Plugin
@@ -366,7 +370,7 @@ Function Main() {
 
 	# Local farm
 	(Get-SPFarm).BuildVersion
-	$servers = Get-SPServer |? {$_.Role -ne "Invalid"}
+	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
 	
 	# Core steps
 	EnablePS
@@ -389,6 +393,17 @@ Function Main() {
 	Write-Host "===== DONE =====" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours,2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
+	
+	# Reboot local
+	Write-Host "Local machine needs to reboot"
+	Write-Host "Type YES to continue"  -Fore Yellow
+	$p = Read-Host
+	if ($p -eq "YES") {
+		Write-Host "Rebooting ... "
+		Restart-Computer -Delay 10 -Force
+	} else {
+		Write-Host "Reboot cancelled"
+	}
 	Stop-Transcript
 }
 
