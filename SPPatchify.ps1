@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.2
-	Last Modified	: 05-02-2015
+	Version			: 0.3
+	Last Modified	: 05-05-2015
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -364,8 +364,7 @@ Function IISStart() {
 
 Function RebootLocal() {
 	# reboot local machine
-	Write-Host "Local machine needs to reboot"
-	Write-Host "Type YES to continue"  -Fore Yellow
+	Write-Host "Local machine needs to reboot.  Reboot now?  [Y]" -Fore Yellow
 	$p = Read-Host
 	if ($p -eq "YES") {
 		Write-Host "Rebooting ... "
@@ -375,33 +374,96 @@ Function RebootLocal() {
 	}
 }
 
-Function PatchMenu() {
-	# PatchMenu
-	$csv = Import-Csv "SPPatchify.csv"
-	cls
-	Write-Host "================ CHOOSE CU PATCH MONTH ================"
-	Write-Host "L: Press 'L' for the latest patch (Apr 2016)"
-	Write-Host ""
-	Write-Host "1: Press '1' for Jan 2016"
-	Write-Host "2: Press '2' for Feb 2016"
-	Write-Host "3: Press '3' for Mar 2016"
-	Write-Host "4: Press '4' for Apr 2016"
-	$input = Read-Host "Please make a selection"
-	switch ($input) {
-		'L' {
-			$input = '4'
+Function ShowForm() {
+	# Load DLL
+	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+	$local = "C:\SPPatchify\SPPatchify.csv"
+	$csv = Import-Csv $local
+
+	# WinForm
+	$form = New-Object System.Windows.Forms.Form
+	$form.Text = 'Select Month'
+	$form.Size = New-Object System.Drawing.Size(260,180)
+	$form.MaximizeBox = $false
+	$form.MinimizeBox = $false
+	$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
+
+	# Label
+	$lbl = New-Object System.Windows.Forms.Label
+	$lbl.Text = "SharePoint month to download. `nPatch files be saved to \media\ folder."
+	$lbl.Top = 10
+	$lbl.Left = 10
+	$lbl.Width = 220
+	$form.Controls.Add($lbl)
+
+	# Drop Down
+	$selMonth = New-Object System.Windows.Forms.ComboBox
+	foreach ($c in ($csv | Sort Year,Month -Desc | Select Year,Month -Unique)) {
+		$row = $c.Year + " " + (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($c.Month)
+		if (!$text) {$text = $row}
+		$selMonth.Items.add($row) | Out-Null
+	}
+	$selMonth.Top = 60
+	$selMonth.Left = 10
+	$selMonth.DropDownStyle  = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+	$selMonth.Text = $text
+	$form.Controls.Add($selMonth)
+
+	# Button
+	$btnOK = New-Object System.Windows.Forms.Button
+	$btnOK.Text = "OK"
+	$btnOK.Top = 60
+	$btnOK.Left = 160
+	$btnOK.Width = 80
+	$form.Controls.Add($btnOK)
+
+	# Event Handlers
+	function ClickBtnOK() {
+		$global:selmonth = $selMonth.Text 
+		$form.Close()
+	}
+	$btnOK.Add_Click({ClickBtnOK})
+
+	# Display form
+	$res = $form.ShowDialog()
+}
+
+Function GetMonthInt($name) {
+	1..12 |% {
+		if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
+			return $_
 		}
 	}
-	if (Get-Command Get-SPProjectWebInstance) {
+}
+
+Function PatchMenu() {
+	# Download CSV of patches
+    $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify.csv"
+    $local = "C:\SPPatchify\SPPatchify.csv"
+    $wc = New-Object System.Net.Webclient
+    $wc.DownloadFile($source, $local)
+	$csv = Import-Csv $local
+
+    # Prompt for user choice
+    $ver = (Get-SPFarm).BuildVersion.Major
+    $ver = "15"
+	ShowForm
+	
+	# SKU scope
+	if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
 		$sku = "PROJ"
 	} else {
 		$sku = "SP"
 	}
-	$patchFiles = $csv |? {$_.Year -eq '2016' -and $_.Month -eq $input -and $_.Product -eq "$sku$ver"}
-
-
-	# PatchDownload
-	$bits = (Get-Command Start-BitsTransfer)
+	
+	# Filter CSV for file names
+	$year = $global:selmonth.Split(" ")[0]
+	$month = GetMonthInt $global:selmonth.Split(" ")[1]
+	$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
+	$patchFiles | ft -a
+	
+	# Download patch media
+	$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
 	foreach ($file in $patchFiles) {
 		# Parameters
 		$splits = $file.URL.Split("/")
@@ -430,15 +492,21 @@ Function Main() {
 	# Start time
 	$start = Get-Date
 	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
-	$logFile = "log\$($MyInvocation.MyCommand)-$when.txt"
+	$logFile = "log\SPPatchify-$when.txt"
 	Start-Transcript $logFile
 
 	# Local farm
 	(Get-SPFarm).BuildVersion
 	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
 
+	# Download media
+	Write-Host "Want to download patch files to \media\? [Y]" -Fore Yellow
+	$res = Read-Host
+	if ($res -match "y") {
+		PatchMenu
+	}
+	
 	# Core steps
-	PatchMenu
 	EnablePS
  	ReadIISPW
 	CopyEXE "Copy"
@@ -458,7 +526,7 @@ Function Main() {
 	
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
-	$th = [Math]::Round(((Get-Date) - $start).TotalHours,2)
+	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
 }
