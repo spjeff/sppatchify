@@ -10,14 +10,13 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.3
-	Last Modified	: 05-05-2015
+	Version			: 0.4
+	Last Modified	: 05-16-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
 	
 	Patch Notes
-	http://www.toddklindt.com/blog/Lists/Posts/Post.aspx?ID=346
 	http://sharepointupdates.com
 #>
 
@@ -52,7 +51,6 @@ Function CopyEXE($action) {
 				# Delete
 				del "\\$addr\C$\SPPatchify\media\*.*" -confirm:$false
 			}
-			
 		}
 	}
 	Write-Progress -Activity "Completed" -Completed
@@ -164,28 +162,30 @@ Function ChangeDC() {
 
 	# Distributed Cache
 	$sb = {
-		Use-CacheCluster
-		Get-AFCacheClusterHealth -ErrorAction SilentlyContinue
-		$computer = [System.Net.Dns]::GetHostByName($env:computername).HostName
-		$counter = 0
-		$maxLoops = 60
-		
-		$cache = Get-CacheHost |? {$_.HostName -eq $computer}
-		if ($cache) {
-			do {
-				try {
-				# Wait for graceful stop
-				$hostInfo = Stop-CacheHost -Graceful -CachePort 22233 -HostName $computer -ErrorAction SilentlyContinue
-				Write-Host $computer $hostInfo.Status
-				Sleep 5
-				$counter++
-				} catch {break}
-			} while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
+		try {
+			Use-CacheCluster
+			Get-AFCacheClusterHealth -ErrorAction SilentlyContinue
+			$computer = [System.Net.Dns]::GetHostByName($env:computername).HostName
+			$counter = 0
+			$maxLoops = 60
 			
-			# Force stop
-			Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
-			Stop-SPDistributedCacheServiceInstance
-		}
+			$cache = Get-CacheHost |? {$_.HostName -eq $computer}
+			if ($cache) {
+				do {
+					try {
+					# Wait for graceful stop
+					$hostInfo = Stop-CacheHost -Graceful -CachePort 22233 -HostName $computer -ErrorAction SilentlyContinue
+					Write-Host $computer $hostInfo.Status
+					Sleep 5
+					$counter++
+					} catch {break}
+				} while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
+				
+				# Force stop
+				Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+				Stop-SPDistributedCacheServiceInstance
+			}
+		} catch {}
 	}
 	LoopRemoteCmd "Stop Distributed Cache on " $sb
 }
@@ -249,7 +249,7 @@ Function RunConfigWizard() {
 	
 	# Save B2B shortcut
 	$b2b = {
-		$file = $psconfig.replace("psconfig.exe","psconfigb2b.cmd")
+		$file = $psconfig.replace("psconfig.exe", "psconfigb2b.cmd")
 		if (!(Test-Path $file)) {
 			"psconfig.exe $options" | Out-File $file -Force
 		}
@@ -258,7 +258,7 @@ Function RunConfigWizard() {
 	
 	# Run Config Wizard
 	$wiz = {
-		& "$psconfig" $options
+		& "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources"
 	}
 	LoopRemoteCmd "Run Config Wizard on " @($shared,$wiz)
 }
@@ -337,11 +337,10 @@ Function ReadIISPW {
 }
 
 Function DisplayCA() {
-	# version table
-	(Get-SPFarm).BuildVersion
-	$ver = (Get-SPFarm).BuildVersion.Major
-	
+	# version table	
 	$sb = {
+		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+		$ver = (Get-SPFarm).BuildVersion.Major;
 		[System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion,@{N='PC'; E={$env:computername}}
 	}
 	LoopRemoteCmd "Get file version on " $sb
@@ -355,22 +354,22 @@ Function DisplayCA() {
 Function IISStart() {
 	# start IIS pools and sites
 	$sb = {
-		net start w3svc
-		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n}
-		Get-WebSite | Start-WebSite
+		net start w3svc | Out-Null
+		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
+		Get-WebSite | Start-WebSite | Out-Null
 	}
 	LoopRemoteCmd "Start IIS on " $sb
 }
 
 Function RebootLocal() {
 	# reboot local machine
-	Write-Host "Local machine needs to reboot.  Reboot now?  [Y]" -Fore Yellow
+	Write-Host "Local machine needs to reboot.  Reboot now?  [Y/N]" -Fore Yellow
 	$p = Read-Host
 	if ($p -eq "YES") {
 		Write-Host "Rebooting ... "
 		Restart-Computer -Delay 10 -Force
 	} else {
-		Write-Host "Reboot cancelled"
+		Write-Host "NO reboot"
 	}
 }
 
@@ -500,10 +499,12 @@ Function Main() {
 	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
 
 	# Download media
-	Write-Host "Want to download patch files to \media\? [Y]" -Fore Yellow
+	Write-Host "Want to download patch files to \media\? [Y/N]" -Fore Yellow
 	$res = Read-Host
 	if ($res -match "y") {
 		PatchMenu
+	} else {
+		Write-Host "NO media download"
 	}
 	
 	# Core steps
@@ -519,7 +520,7 @@ Function Main() {
 	ChangeServices $true
 	RunConfigWizard
 	ChangeContent $true
-	CopyEXE "Remove"
+	#REM CopyEXE "Remove"
 	IISStart
 	DisplayCA
 	RebootLocal
