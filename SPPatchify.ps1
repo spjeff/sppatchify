@@ -520,7 +520,7 @@ Function Main() {
 	ChangeServices $true
 	RunConfigWizard
 	ChangeContent $true
-	#REM CopyEXE "Remove"
+	CopyEXE "Remove"
 	IISStart
 	DisplayCA
 	RebootLocal
