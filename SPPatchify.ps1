@@ -116,6 +116,7 @@ Function WaitReboot() {
 		# Remote Posh
 		while (!$remote) {
 			$remote = New-PSSession -ComputerName $addr
+			Start-Sleep 3
 		}
 	}
 	Get-PSSession | Remove-PSSession
@@ -148,6 +149,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		
 		# Remote Posh
 		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
+		Start-Sleep 3
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
 			Write-Host $s.ToString()
