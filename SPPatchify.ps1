@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.5
+	Version			: 0.6
 	Last Modified	: 05-18-2016
 .LINK
 	Source Code
@@ -116,6 +116,7 @@ Function WaitReboot() {
 		# Remote Posh
 		while (!$remote) {
 			$remote = New-PSSession -ComputerName $addr
+			Start-Sleep 3
 		}
 	}
 	Get-PSSession | Remove-PSSession
@@ -147,7 +148,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		$counter++
 		
 		# Remote Posh
-		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
+		$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP
         Start-Sleep 3
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
@@ -156,7 +157,6 @@ Function LoopRemoteCmd($msg, $cmd) {
 		}
 		Write-Host "<< complete on $addr" -Fore Green
 	}
-	Get-PSSession | Remove-PSSession
 	Write-Progress -Activity "Completed" -Completed	
 }
 
@@ -300,7 +300,7 @@ Function ChangeContent($state) {
 #endregion
 
 #region general
-Function EnablePS() {
+Function EnablePSRemoting() {
 	$ssp = Get-WSManCredSSP
 	if ($ssp[0] -match "not configured to allow delegating") {
 		# Enable remote PowerShell over CredSSP authentication
@@ -537,7 +537,7 @@ Function Main() {
 	}
 	
 	# Core steps
-    EnablePS
+    EnablePSRemoting
  	ReadIISPW
 	CopyEXE "Copy"
 	ChangeDC
@@ -546,9 +546,9 @@ Function Main() {
 	StartEXE
 	WaitEXE
 	WaitReboot
-    ProductLocal
 	ChangeContent $false
 	ChangeServices $true
+	ProductLocal
 	RunConfigWizard
 	ChangeContent $true
 	CopyEXE "Remove"
