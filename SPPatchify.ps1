@@ -389,7 +389,7 @@ Function IISStart() {
 		}
 
         # W3WP
-		net start w3svc | Out-Null
+		Start-Service w3svc | Out-Null
 		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
 		Get-WebSite | Start-WebSite | Out-Null
 	}
