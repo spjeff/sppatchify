@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.6
+	Version			: 0.7
 	Last Modified	: 05-18-2016
 .LINK
 	Source Code
@@ -19,6 +19,14 @@
 	Patch Notes
 	http://sharepointupdates.com
 #>
+
+[CmdletBinding()]
+param (
+
+	[Parameter(Mandatory=$False, Position=0, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
+	[Alias("c")]
+	[switch]$copyOnly
+)
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -63,7 +71,11 @@ Function StartEXE() {
 	# Build CMD
 	$files = Get-ChildItem ".\media\*.exe"
 	if ($files -is [System.Array]) {
-		$name = $files[0].Name
+		# HALT - multiple EXE found - require clean up before continuing
+		$files | Format-Table -AutoSize
+		Write-Host "HALT - multiple EXE found - please clean up before continuing" -Fore Red
+		Stop-Transcript
+		Exit
 	} else {
 		$name = $files.Name
 	}
@@ -537,25 +549,29 @@ Function Main() {
 	}
 	
 	# Core steps
-    EnablePSRemoting
- 	ReadIISPW
-	CopyEXE "Copy"
-	ChangeDC
-	ChangeServices $false
-	IISStart
-	StartEXE
-	WaitEXE
-	WaitReboot
-	ChangeContent $false
-	ChangeServices $true
-	ProductLocal
-	RunConfigWizard
-	ChangeContent $true
-	CopyEXE "Remove"
-	IISStart
-	DisplayCA
-	RebootLocal
-	
+	if ($copyOnly) {
+		CopyEXE "Copy"
+	} else {
+		EnablePSRemoting
+		ReadIISPW
+		CopyEXE "Copy"
+		ChangeDC
+		ChangeServices $false
+		IISStart
+		StartEXE
+		WaitEXE
+		WaitReboot
+		ChangeContent $false
+		ChangeServices $true
+		ProductLocal
+		RunConfigWizard
+		ChangeContent $true
+		CopyEXE "Remove"
+		IISStart
+		DisplayCA
+		RebootLocal
+	}
+
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
