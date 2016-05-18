@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 	SharePoint Central Admin - View active services across entire farm. No more select machine drop down dance!
 .DESCRIPTION
@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.4
-	Last Modified	: 05-16-2016
+	Version			: 0.5
+	Last Modified	: 05-17-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -51,6 +51,7 @@ Function CopyEXE($action) {
 				# Delete
 				del "\\$addr\C$\SPPatchify\media\*.*" -confirm:$false
 			}
+			
 		}
 	}
 	Write-Progress -Activity "Completed" -Completed
@@ -67,7 +68,7 @@ Function StartEXE() {
 		$name = $files.Name
 	}
 	$global:patchName = $name.replace(".exe","")
-	$cmd = "Start-Process 'C:\SPPatchify\media\$name' -ArgumentList '/quiet /forcerestart /log:""C:\SPPatchify\log\$name.log""' -PassThru -NoNewWindow"
+	$cmd = "Start-Process 'C:\SPPatchify\media\$name' -ArgumentList '/quiet /forcerestart /log:""C:\SPPatchify\log\$name.log""' -PassThru"
 	LoopRemoteCmd "Run EXE on " $cmd
 }
 
@@ -126,6 +127,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 	# Loop servers
 	$counter = 0
 	foreach ($server in $servers) {
+
 		# Script block
 		if ($cmd.GetType().Name -eq "String") {
 			if ($env:computername -eq $server.Address) {
@@ -148,7 +150,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
-			$s.ToString()
+			Write-Host $s.ToString()
 			Invoke-Command -Session $remote -ScriptBlock $s
 		}
 		Write-Host "<< complete on $addr" -Fore Green
@@ -197,8 +199,8 @@ Function ChangeServices($state) {
 	if ($state) {
 		$action = "START"
 		$sb = {
-			@("IISAdmin","SPTimerV4") |% {
-				if (Get-Service $_) {
+			@("IISAdmin","SPTimerV4","SQLBrowser") |% {
+				if (Get-Service $_ -ErrorAction SilentlyContinue) {
 					Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
 					Start-Service $_ -ErrorAction SilentlyContinue
 				}
@@ -212,7 +214,7 @@ Function ChangeServices($state) {
 		$action = "STOP"
 		$sb = {
 			Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-			@("IISAdmin","SPTimerV4") |% {
+			@("IISAdmin","SPTimerV4","SQLBrowser") |% {
 				if (Get-Service $_) {
 					Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
 					Stop-Service $_ -ErrorAction SilentlyContinue
@@ -315,6 +317,14 @@ Function ReadIISPW {
 	$user = $env:username
 	Write-Host "Logged in as $domain\$user"
 	
+	# Start IISAdmin if needed
+	$iisadmin = Get-Service IISADMIN
+	if ($iisadmin.Status -ne "Running") {
+		#set Automatic and Start
+		Set-Service -Name IISADMIN -StartupType Automatic -ErrorAction SilentlyContinue
+		Start-Service IISADMIN -ErrorAction SilentlyContinue
+	}
+	
 	# Attempt to detect password from IIS Pool (if current user is local admin and farm account)
 	$appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | Select-Object WAMUserName, WAMUserPass
 	foreach ($pool in $appPools) {	
@@ -354,11 +364,30 @@ Function DisplayCA() {
 Function IISStart() {
 	# start IIS pools and sites
 	$sb = {
+        Import-Module WebAdministration
+
+        # IISAdmin
+        $iisadmin = Get-Service IISADMIN
+        if ($iisadmin) {
+			Set-Service -Name $iisadmin -StartupType Automatic -ErrorAction SilentlyContinue
+			Start-Service $iisadmin -ErrorAction SilentlyContinue
+		}
+
+        # W3WP
 		net start w3svc | Out-Null
 		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
 		Get-WebSite | Start-WebSite | Out-Null
 	}
 	LoopRemoteCmd "Start IIS on " $sb
+}
+
+Function ProductLocal() {
+    # sync local SKU binary to config DB
+	$sb = {
+        Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+        Get-SPProduct -Local
+	}
+	LoopRemoteCmd "Product local SKU on " $sb
 }
 
 Function RebootLocal() {
@@ -376,7 +405,7 @@ Function RebootLocal() {
 Function ShowForm() {
 	# Load DLL
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
-	$local = "C:\SPPatchify\SPPatchify.csv"
+	$local = "C:\SPPatchify\SPPatchify-Download-CU.csv"
 	$csv = Import-Csv $local
 
 	# WinForm
@@ -437,8 +466,8 @@ Function GetMonthInt($name) {
 
 Function PatchMenu() {
 	# Download CSV of patches
-    $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify.csv"
-    $local = "C:\SPPatchify\SPPatchify.csv"
+    $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
+    $local = "C:\SPPatchify\SPPatchify-Download-CU.csv"
     $wc = New-Object System.Net.Webclient
     $wc.DownloadFile($source, $local)
 	$csv = Import-Csv $local
@@ -508,22 +537,29 @@ Function Main() {
 	}
 	
 	# Core steps
-	EnablePS
+    EnablePS
  	ReadIISPW
+	
 	CopyEXE "Copy"
 	ChangeDC
+	#>
 	ChangeServices $false
+	IISStart
 	StartEXE
+	<#
 	WaitEXE
 	WaitReboot
+	
+    ProductLocal
 	ChangeContent $false
 	ChangeServices $true
 	RunConfigWizard
 	ChangeContent $true
-	CopyEXE "Remove"
+	#REM CopyEXE "Remove"
 	IISStart
 	DisplayCA
 	RebootLocal
+	#>
 	
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
