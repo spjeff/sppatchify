@@ -11,7 +11,7 @@
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
 	Version			: 0.5
-	Last Modified	: 05-17-2016
+	Last Modified	: 05-18-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -92,7 +92,7 @@ Function WaitEXE() {
 		Write-Host "`nEXE started on $addr at $when " -NoNewLine
 		do {
 			$proc = Get-Process -Name $global:patchName -Computer $addr -ErrorAction SilentlyContinue
-			Sleep 2
+			Sleep 3
 			Write-Host "."  -NoNewLine
 		} while ($proc)
 	}
@@ -116,7 +116,6 @@ Function WaitReboot() {
 		# Remote Posh
 		while (!$remote) {
 			$remote = New-PSSession -ComputerName $addr
-			Start-Sleep 3
 		}
 	}
 	Get-PSSession | Remove-PSSession
@@ -136,7 +135,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 			} else {
 				$runCmd = $cmd
 			}
-			$sb = [ScriptBlock]::Create("$runCmd")
+			$sb = [ScriptBlock]::Create($runCmd)
 		} else {
 			$sb = $cmd
 		}
@@ -149,7 +148,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		
 		# Remote Posh
 		$remote = New-PSSession -ComputerName $addr -Authentication CredSSP -Credential $global:cred
-		Start-Sleep 3
+        Start-Sleep 3
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
 			Write-Host $s.ToString()
@@ -248,7 +247,6 @@ Function RunConfigWizard() {
 		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 		$ver = (Get-SPFarm).BuildVersion.Major
 		$psconfig = "C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\BIN\psconfig.exe"
-		$options = "-cmd upgrade -inplace b2b -wait -cmd applicationcontent -install -cmd installfeatures -cmd secureresources"
 	}
 	
 	# Save B2B shortcut
@@ -407,7 +405,7 @@ Function RebootLocal() {
 Function ShowForm() {
 	# Load DLL
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
-	$local = "C:\SPPatchify\SPPatchify-Download-CU.csv"
+	$local = "C:\SPPatchify\SPPatchify.csv"
 	$csv = Import-Csv $local
 
 	# WinForm
@@ -541,27 +539,22 @@ Function Main() {
 	# Core steps
     EnablePS
  	ReadIISPW
-	
 	CopyEXE "Copy"
 	ChangeDC
-	#>
 	ChangeServices $false
 	IISStart
 	StartEXE
-	<#
 	WaitEXE
 	WaitReboot
-	
     ProductLocal
 	ChangeContent $false
 	ChangeServices $true
 	RunConfigWizard
 	ChangeContent $true
-	#REM CopyEXE "Remove"
+	CopyEXE "Remove"
 	IISStart
 	DisplayCA
 	RebootLocal
-	#>
 	
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
