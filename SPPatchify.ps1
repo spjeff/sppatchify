@@ -15,6 +15,7 @@
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
+	https://www.spjeff.com/2016/05/16/sppatchify-cu-patch-entire-farm-from-one-script/
 	
 	Patch Notes
 	http://sharepointupdates.com
@@ -22,7 +23,6 @@
 
 [CmdletBinding()]
 param (
-
 	[Parameter(Mandatory=$False, Position=0, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
 	[Alias("c")]
 	[switch]$copyOnly
@@ -89,8 +89,8 @@ Function WaitEXE() {
 	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
-	Sleep 30
-			
+	Start-Sleep 30
+
 	# Verify machines online
 	$counter = 0
 	foreach ($server in $servers) {
@@ -104,8 +104,8 @@ Function WaitEXE() {
 		Write-Host "`nEXE started on $addr at $when " -NoNewLine
 		do {
 			$proc = Get-Process -Name $global:patchName -Computer $addr -ErrorAction SilentlyContinue
-			Sleep 3
 			Write-Host "."  -NoNewLine
+			Start-Sleep 3
 		} while ($proc)
 	}
 }
@@ -115,7 +115,7 @@ Function WaitReboot() {
 	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
-	Sleep 30
+	Start-Sleep 30
 			
 	# Verify machines online
 	$counter = 0
@@ -128,6 +128,7 @@ Function WaitReboot() {
 		# Remote Posh
 		while (!$remote) {
 			$remote = New-PSSession -ComputerName $addr
+			Write-Host "."  -NoNewLine
 			Start-Sleep 3
 		}
 	}
@@ -188,12 +189,14 @@ Function ChangeDC() {
 			if ($cache) {
 				do {
 					try {
-					# Wait for graceful stop
-					$hostInfo = Stop-CacheHost -Graceful -CachePort 22233 -HostName $computer -ErrorAction SilentlyContinue
-					Write-Host $computer $hostInfo.Status
-					Sleep 5
-					$counter++
-					} catch {break}
+						# Wait for graceful stop
+						$hostInfo = Stop-CacheHost -Graceful -CachePort 22233 -HostName $computer -ErrorAction SilentlyContinue
+						Write-Host $computer $hostInfo.Status
+						Start-Sleep 5
+						$counter++
+					} catch {
+						break
+					}
 				} while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
 				
 				# Force stop
