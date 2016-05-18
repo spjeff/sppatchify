@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.7
+	Version			: 0.8
 	Last Modified	: 05-18-2016
 .LINK
 	Source Code
@@ -406,7 +406,7 @@ Function RebootLocal() {
 	# reboot local machine
 	Write-Host "Local machine needs to reboot.  Reboot now?  [Y/N]" -Fore Yellow
 	$p = Read-Host
-	if ($p -eq "YES") {
+	if ($p -match "y") {
 		Write-Host "Rebooting ... "
 		Restart-Computer -Delay 10 -Force
 	} else {
