@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.8
-	Last Modified	: 05-18-2016
+	Version			: 0.9
+	Last Modified	: 05-19-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -30,10 +30,18 @@ param (
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+$root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 #region binary EXE
 Function CopyEXE($action) {
 	Write-Host "===== $action EXE =====" -Fore Yellow
+	
+	# Remote UNC
+	$char = $root.ToCharArray()
+	if ($char[1] -eq ':') {
+		$char[1] = '$'
+	}
+	$remoteRoot = $char.ToCharArray()
 
 	# Loop servers
 	$counter = 0
@@ -50,14 +58,14 @@ Function CopyEXE($action) {
 				$files = Get-ChildItem ".\media\*.*"
 				foreach ($file in $files) {
 					$name = $file.Name
-					$dest = "\\$addr\C$\SPPatchify\media"
+					$dest = "\\$addr\$remoteRoot\media"
 					mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null
 					mkdir $dest.replace("media","log") -Force -ErrorAction SilentlyContinue | Out-Null
 					ROBOCOPY "media" $dest /Z /W:0 /R:0 /XX
 				}
 			} else {
 				# Delete
-				del "\\$addr\C$\SPPatchify\media\*.*" -confirm:$false
+				del "\\$addr\$remoteRoot\media\*.*" -confirm:$false
 			}
 			
 		}
@@ -80,7 +88,7 @@ Function StartEXE() {
 		$name = $files.Name
 	}
 	$global:patchName = $name.replace(".exe","")
-	$cmd = "Start-Process 'C:\SPPatchify\media\$name' -ArgumentList '/quiet /forcerestart /log:""C:\SPPatchify\log\$name.log""' -PassThru"
+	$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
 	LoopRemoteCmd "Run EXE on " $cmd
 }
 
@@ -405,6 +413,11 @@ Function ProductLocal() {
 	LoopRemoteCmd "Product local SKU on " $sb
 }
 
+Function UpgradeContent() {
+	# upgrade SQL content schema
+	Get-SPContentDatabase | {$_.Name; Upgrade-SPContentDatabase -Confirm:$false}
+}
+
 Function RebootLocal() {
 	# reboot local machine
 	Write-Host "Local machine needs to reboot.  Reboot now?  [Y/N]" -Fore Yellow
@@ -420,7 +433,7 @@ Function RebootLocal() {
 Function ShowForm() {
 	# Load DLL
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
-	$local = "C:\SPPatchify\SPPatchify.csv"
+	$local = "$root\SPPatchify-Download-CU.csv"
 	$csv = Import-Csv $local
 
 	# WinForm
@@ -482,7 +495,7 @@ Function GetMonthInt($name) {
 Function PatchMenu() {
 	# Download CSV of patches
     $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
-    $local = "C:\SPPatchify\SPPatchify-Download-CU.csv"
+    $local = "$root\SPPatchify-Download-CU.csv"
     $wc = New-Object System.Net.Webclient
     $wc.DownloadFile($source, $local)
 	$csv = Import-Csv $local
@@ -511,7 +524,7 @@ Function PatchMenu() {
 		# Parameters
 		$splits = $file.URL.Split("/")
 		$name = $splits[$splits.Count - 1]
-		$dest = "C:\SPPatchify\media\$name"
+		$dest = "$root\media\$name"
 
 		if (Test-Path $dest) {
 			Write-Host "Found $name"
@@ -569,6 +582,7 @@ Function Main() {
 		ProductLocal
 		RunConfigWizard
 		ChangeContent $true
+		UpgradeContent
 		CopyEXE "Remove"
 		IISStart
 		DisplayCA
