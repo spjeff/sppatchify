@@ -474,7 +474,7 @@ Function ShowForm() {
 	$form.Controls.Add($btnOK)
 
 	# Event Handlers
-	function ClickBtnOK() {
+	Function ClickBtnOK() {
 		$global:selmonth = $selMonth.Text 
 		$form.Close()
 	}
