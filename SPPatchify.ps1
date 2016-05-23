@@ -239,7 +239,7 @@ Function ChangeServices($state) {
 		$sb = {
 			Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
 			@("IISAdmin","SPTimerV4","SQLBrowser","Schedule") |% {
-				if (Get-Service $_) {
+				if (Get-Service $_ -ErrorAction SilentlyContinue) {
 					Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
 					Stop-Service $_ -ErrorAction SilentlyContinue
 				}
