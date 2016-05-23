@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.9
+	Version			: 0.10
 	Last Modified	: 05-23-2016
 .LINK
 	Source Code
