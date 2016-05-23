@@ -82,7 +82,6 @@ Function StartEXE() {
 		# HALT - multiple EXE found - require clean up before continuing
 		$files | Format-Table -AutoSize
 		Write-Host "HALT - multiple EXE found - please clean up before continuing" -Fore Red
-		Stop-Transcript
 		Exit
 	} else {
 		$name = $files.Name
@@ -424,7 +423,7 @@ Function RebootLocal() {
 	$p = Read-Host
 	if ($p -match "y") {
 		Write-Host "Rebooting ... "
-		Restart-Computer -Delay 10 -Force
+		Restart-Computer -Delay 10 -Wait -Force
 	} else {
 		Write-Host "NO reboot"
 	}
