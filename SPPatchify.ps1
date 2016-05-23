@@ -41,7 +41,7 @@ Function CopyEXE($action) {
 	if ($char[1] -eq ':') {
 		$char[1] = '$'
 	}
-	$remoteRoot = $char.ToCharArray()
+	$remoteRoot = -join $char
 
 	# Loop servers
 	$counter = 0
