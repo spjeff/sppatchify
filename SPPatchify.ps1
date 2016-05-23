@@ -415,7 +415,7 @@ Function ProductLocal() {
 
 Function UpgradeContent() {
 	# upgrade SQL content schema
-	Get-SPContentDatabase |% {$_.Name; Upgrade-SPContentDatabase -Confirm:$false}
+	Get-SPContentDatabase |% {$_.Name; $_ | Upgrade-SPContentDatabase -Confirm:$false}
 }
 
 Function RebootLocal() {
