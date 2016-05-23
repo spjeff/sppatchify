@@ -492,53 +492,63 @@ Function GetMonthInt($name) {
 }
 
 Function PatchMenu() {
-	# Download CSV of patches
-    $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
-    $local = "$root\SPPatchify-Download-CU.csv"
-    $wc = New-Object System.Net.Webclient
-    $wc.DownloadFile($source, $local)
-	$csv = Import-Csv $local
 
-    # Prompt for user choice
-    $ver = (Get-SPFarm).BuildVersion.Major
-    $ver = "15"
-	ShowForm
-	
-	# SKU scope
-	if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
-		$sku = "PROJ"
-	} else {
-		$sku = "SP"
-	}
-	
-	# Filter CSV for file names
-	$year = $global:selmonth.Split(" ")[0]
-	$month = GetMonthInt $global:selmonth.Split(" ")[1]
-	$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
-	$patchFiles | ft -a
-	
-	# Download patch media
-	$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
-	foreach ($file in $patchFiles) {
-		# Parameters
-		$splits = $file.URL.Split("/")
-		$name = $splits[$splits.Count - 1]
-		$dest = "$root\media\$name"
-
-		if (Test-Path $dest) {
-			Write-Host "Found $name"
+	try {
+		# Download CSV of patches
+		$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
+		$local = "$root\SPPatchify-Download-CU.csv"
+		$wc = New-Object System.Net.Webclient
+		$dest = $local.Replace(".csv","-temp.csv")
+		$wc.DownloadFile($source, $dest)
+		
+		# Overwrite if downloaded OK
+		Copy-Item $dest $local -Force
+		$csv = Import-Csv $local
+		
+		# Prompt for user choice
+		$ver = (Get-SPFarm).BuildVersion.Major
+		$ver = "15"
+		ShowForm
+		
+		# SKU scope
+		if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
+			$sku = "PROJ"
 		} else {
-			Write-Host "Downloading $name"
-			if ($bits) {
-				# pefer BITS
-				 Write-Host "BITS $dest"
-				Start-BitsTransfer -Source $file.URL -Destination $dest
+			$sku = "SP"
+		}
+		
+		# Filter CSV for file names
+		$year = $global:selmonth.Split(" ")[0]
+		$month = GetMonthInt $global:selmonth.Split(" ")[1]
+		$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
+		$patchFiles | ft -a
+		
+		# Download patch media
+		$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
+		foreach ($file in $patchFiles) {
+			# Parameters
+			$splits = $file.URL.Split("/")
+			$name = $splits[$splits.Count - 1]
+			$dest = "$root\media\$name"
+
+			if (Test-Path $dest) {
+				Write-Host "Found $name"
 			} else {
-				# Dot Net
-				Write-Host "WebClient $dest"
-				(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
+				Write-Host "Downloading $name"
+				if ($bits) {
+					# pefer BITS
+					 Write-Host "BITS $dest"
+					Start-BitsTransfer -Source $file.URL -Destination $dest
+				} else {
+					# Dot Net
+					Write-Host "WebClient $dest"
+					(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
+				}
 			}
 		}
+	} catch {
+		# Error downloading
+		Write-Host "Error - Unable to download.  Please verify proxy server and Internet connection." -Fore Red
 	}
 }
 #endregion
