@@ -557,7 +557,7 @@ Function Main() {
 	# Start time
 	$start = Get-Date
 	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
-	$logFile = "log\SPPatchify-$when.txt"
+	$logFile = "$root\log\SPPatchify-$when.txt"
 	Start-Transcript $logFile
 
 	# Local farm
