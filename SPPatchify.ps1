@@ -423,7 +423,7 @@ Function RebootLocal() {
 	$p = Read-Host
 	if ($p -match "y") {
 		Write-Host "Rebooting ... "
-		Restart-Computer -Delay 10 -Wait -Force
+		Restart-Computer -Force
 	} else {
 		Write-Host "NO reboot"
 	}
@@ -585,7 +585,6 @@ Function Main() {
 		CopyEXE "Remove"
 		IISStart
 		DisplayCA
-		RebootLocal
 	}
 
 	# Run duration
@@ -593,6 +592,11 @@ Function Main() {
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
+	
+	# Reboot
+	if (!$copyOnly) {
+		RebootLocal
+	}
 }
 
 Main
