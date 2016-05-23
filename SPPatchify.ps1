@@ -11,7 +11,7 @@
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
 	Version			: 0.9
-	Last Modified	: 05-19-2016
+	Last Modified	: 05-23-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -415,7 +415,7 @@ Function ProductLocal() {
 
 Function UpgradeContent() {
 	# upgrade SQL content schema
-	Get-SPContentDatabase | {$_.Name; Upgrade-SPContentDatabase -Confirm:$false}
+	Get-SPContentDatabase |% {$_.Name; Upgrade-SPContentDatabase -Confirm:$false}
 }
 
 Function RebootLocal() {
