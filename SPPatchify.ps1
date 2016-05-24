@@ -304,7 +304,6 @@ Function ChangeContent($state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
 		if ($dbs) {
-			
 			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "contentdbs-$when.csv"
 			$dbs |% {
 				$_.Name
@@ -585,6 +584,7 @@ Function Main() {
 	$start = Get-Date
 	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
 	$logFile = "$root\log\SPPatchify-$when.txt"
+	mkdir "$root\log" -ErrorAction SilentlyContinue | Out-Null
 	Start-Transcript $logFile
 	
 	# Params
@@ -615,6 +615,7 @@ Function Main() {
 		}
 	} else {
 		# Phase Two - SP Config Wizard
+		ReadIISPW
 		ChangeContent $false
 		ChangeServices $true
 		ProductLocal
