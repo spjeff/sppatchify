@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.11
+	Version			: 0.12
 	Last Modified	: 05-24-2016
 .LINK
 	Source Code
@@ -25,7 +25,11 @@
 param (
 	[Parameter(Mandatory=$False, Position=0, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
 	[Alias("c")]
-	[switch]$copyOnly
+	[switch]$copyOnly,
+	
+	[Parameter(Mandatory=$False, Position=1, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
+	[Alias("p")]
+	[switch]$phaseTwo
 )
 
 # Plugin
@@ -133,7 +137,21 @@ Function WaitReboot() {
 	}
 	Get-PSSession | Remove-PSSession
 }
+
+Function LocalReboot() {
+	# create Regkey
+	New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name RunOnce -ErrorAction SilentlyContinue | Out-Null
+	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -Force | Out-Null
+	
+	# Reboot
+	Write-Host " - REBOOTING - "
+	Stop-Transcript
+	Start-Sleep 5
+	Restart-Computer -Force
+	Exit
+}
 #endregion
+
 
 #region SP Config Wizard
 Function LoopRemoteCmd($msg, $cmd) {
@@ -409,18 +427,6 @@ Function UpgradeContent() {
 	Get-SPContentDatabase |% {$_.Name; $_ | Upgrade-SPContentDatabase -Confirm:$false}
 }
 
-Function RebootLocal() {
-	# reboot local machine
-	Write-Host "Local machine needs to reboot.  Reboot now?  [Y/N]" -Fore Yellow
-	$p = Read-Host
-	if ($p -match "y") {
-		Write-Host "Rebooting ... "
-		Restart-Computer -Force
-	} else {
-		Write-Host "NO reboot"
-	}
-}
-
 Function ShowForm() {
 	# Load DLL
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
@@ -597,6 +603,11 @@ Function Main() {
 		StartEXE
 		WaitEXE
 		WaitReboot
+		LocalReboot
+	}
+	
+	# Phase Two - SP Config Wizard after reboot
+	if ($phaseTwo) {
 		ChangeContent $false
 		ChangeServices $true
 		ProductLocal
@@ -613,11 +624,6 @@ Function Main() {
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
-	
-	# Reboot
-	if (!$copyOnly) {
-		RebootLocal
-	}
 }
 
 Main
