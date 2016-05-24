@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.10
-	Last Modified	: 05-23-2016
+	Version			: 0.11
+	Last Modified	: 05-24-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -67,7 +67,6 @@ Function CopyEXE($action) {
 				# Delete
 				del "\\$addr\$remoteRoot\media\*.*" -confirm:$false
 			}
-			
 		}
 	}
 	Write-Progress -Activity "Completed" -Completed
@@ -78,14 +77,7 @@ Function StartEXE() {
 	
 	# Build CMD
 	$files = Get-ChildItem ".\media\*.exe"
-	if ($files -is [System.Array]) {
-		# HALT - multiple EXE found - require clean up before continuing
-		$files | Format-Table -AutoSize
-		Write-Host "HALT - multiple EXE found - please clean up before continuing" -Fore Red
-		Exit
-	} else {
-		$name = $files.Name
-	}
+	$name = $files[0].Name
 	$global:patchName = $name.replace(".exe","")
 	$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
 	LoopRemoteCmd "Run EXE on " $cmd
@@ -123,7 +115,7 @@ Function WaitReboot() {
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
 	Start-Sleep 30
-			
+	
 	# Verify machines online
 	$counter = 0
 	foreach ($server in $servers) {
@@ -515,6 +507,25 @@ Function PatchMenu() {
 			$sku = "PROJ"
 		} else {
 			$sku = "SP"
+		}
+		Write-Host "SKU = $sku"
+		
+		# Warn if Farm is PROJ and media is not
+		$files = Get-ChildItem ".\media\*prj*.exe"
+		if ($sku -eq "PROJ" -and !$files) {
+			Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
+			Stop-Transcript
+			Exit
+		}
+		
+		# Halt if have multiple EXE
+		$files = Get-ChildItem ".\media\*.exe"
+		if ($files -is [System.Array]) {
+			# HALT - multiple EXE found - require clean up before continuing
+			$files | Format-Table -AutoSize
+			Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
+			Stop-Transcript
+			Exit
 		}
 		
 		# Filter CSV for file names
