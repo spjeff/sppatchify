@@ -490,7 +490,6 @@ Function GetMonthInt($name) {
 }
 
 Function PatchMenu() {
-
 	try {
 		# Download CSV of patches
 		$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
@@ -568,19 +567,8 @@ Function PatchMenu() {
 		Write-Host "Error - Unable to download.  Please verify proxy server and Internet connection." -Fore Red
 	}
 }
-#endregion
 
-Function Main() {
-	# Start time
-	$start = Get-Date
-	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
-	$logFile = "$root\log\SPPatchify-$when.txt"
-	Start-Transcript $logFile
-
-	# Local farm
-	(Get-SPFarm).BuildVersion
-	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
-
+Function DownloadMedia() {
 	# Download media
 	Write-Host "Want to download patch files to \media\? [Y/N]" -Fore Yellow
 	$res = Read-Host
@@ -589,25 +577,44 @@ Function Main() {
 	} else {
 		Write-Host "NO media download"
 	}
+}
+#endregion
+
+Function Main() {
+	# Start time
+	$start = Get-Date
+	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
+	$logFile = "$root\log\SPPatchify-$when.txt"
+	Start-Transcript $logFile
 	
+	# Params
+	Write-Host "copyOnly = $copyOnly"
+	Write-Host "phaseTwo = $phaseTwo"
+
+	# Local farm
+	(Get-SPFarm).BuildVersion
+	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
+
 	# Core steps
-	if ($copyOnly) {
-		CopyEXE "Copy"
+	if (!$phaseTwo) {
+		# Phase One - patch EXE
+		DownloadMedia	
+		if ($copyOnly) {
+			CopyEXE "Copy"
+		} else {
+			EnablePSRemoting
+			ReadIISPW
+			CopyEXE "Copy"
+			ChangeDC
+			ChangeServices $false
+			IISStart
+			StartEXE
+			WaitEXE
+			WaitReboot
+			LocalReboot
+		}
 	} else {
-		EnablePSRemoting
-		ReadIISPW
-		CopyEXE "Copy"
-		ChangeDC
-		ChangeServices $false
-		IISStart
-		StartEXE
-		WaitEXE
-		WaitReboot
-		LocalReboot
-	}
-	
-	# Phase Two - SP Config Wizard after reboot
-	if ($phaseTwo) {
+		# Phase Two - SP Config Wizard
 		ChangeContent $false
 		ChangeServices $true
 		ProductLocal
