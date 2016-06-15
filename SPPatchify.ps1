@@ -32,6 +32,9 @@ param (
 	[switch]$phaseTwo
 )
 
+# Version
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.13"
+
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
