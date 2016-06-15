@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.13
-	Last Modified	: 06-14-2016
+	Version			: 0.14
+	Last Modified	: 06-15-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -33,7 +33,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.13"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.14"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -99,7 +99,7 @@ Function WaitEXE() {
 
 	# Verify machines online
 	$counter = 0
-	foreach ($server in $servers) {
+	foreach ($server in $servers) {	
 		# Progress
 		$addr = $server.Address
 		Write-Progress -Activity "Waiting for " -Status $addr -PercentComplete (($counter/$servers.Count)*100)
@@ -109,6 +109,7 @@ Function WaitEXE() {
 		$when = Get-Date
 		Write-Host "`nEXE started on $addr at $when " -NoNewLine
 		do {
+			# Monitor EXE process
 			$proc = Get-Process -Name $global:patchName -Computer $addr -ErrorAction SilentlyContinue
 			Write-Host "."  -NoNewLine
 			Start-Sleep 3
@@ -148,6 +149,8 @@ Function LocalReboot() {
 	
 	# Reboot
 	Write-Host " - REBOOTING - "
+	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
+	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
 	Start-Sleep 5
 	Restart-Computer -Force
@@ -426,7 +429,19 @@ Function ProductLocal() {
 
 Function UpgradeContent() {
 	# upgrade SQL content schema
-	Get-SPContentDatabase |% {$_.Name; $_ | Upgrade-SPContentDatabase -Confirm:$false}
+	$dbs = Get-SPContentDatabase
+	$counter = 0
+	
+	$dbs |% {
+		$name = $_.Name;
+		
+		# Progress
+		$prct =  [Math]::Round(($counter/$dbs.Count)*100)
+		Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
+		$counter++
+		
+		$_ | Upgrade-SPContentDatabase -Confirm:$false
+	}
 }
 
 Function ShowForm() {
@@ -571,13 +586,14 @@ Function PatchMenu() {
 }
 
 Function DownloadMedia() {
-	# Download media
-	Write-Host "Want to download patch files to \media\? [Y/N]" -Fore Yellow
-	$res = Read-Host
-	if ($res -match "y") {
+	# Already have media?  Then skip
+	$files = Get-ChildItem ".\media\*.exe"
+	if (!$files)	 {
+		# Download media
 		PatchMenu
 	} else {
-		Write-Host "NO media download"
+		Write-Host "Using EXE files found in \media\.  `nTo trigger download GUI first delete these files and run script again."		
+		$files |Format-Table -Auto
 	}
 }
 #endregion
