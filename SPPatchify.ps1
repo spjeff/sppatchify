@@ -27,7 +27,11 @@ param (
 	[Alias("c")]
 	[switch]$copyOnly,
 	
-	[Parameter(Mandatory=$False, Position=1, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
+	[Parameter(Mandatory=$False, Position=1, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
+	[Alias("d")]
+	[switch]$downloadOnly,
+	
+	[Parameter(Mandatory=$False, Position=2, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
 	[Alias("p")]
 	[switch]$phaseTwo
 )
@@ -616,21 +620,27 @@ Function Main() {
 
 	# Core steps
 	if (!$phaseTwo) {
-		# Phase One - patch EXE
-		DownloadMedia	
-		if ($copyOnly) {
-			CopyEXE "Copy"
+		if ($downloadOnly) {
+			# CMD switch -D
+			PatchMenu
 		} else {
-			EnablePSRemoting
-			ReadIISPW
-			CopyEXE "Copy"
-			ChangeDC
-			ChangeServices $false
-			IISStart
-			StartEXE
-			WaitEXE
-			WaitReboot
-			LocalReboot
+			if ($copyOnly) {
+				# CMD switch -C
+				CopyEXE "Copy"
+			} else {
+				# Phase One - patch EXE
+				DownloadMedia
+				EnablePSRemoting
+				ReadIISPW
+				CopyEXE "Copy"
+				ChangeDC
+				ChangeServices $false
+				IISStart
+				StartEXE
+				WaitEXE
+				WaitReboot
+				LocalReboot
+			}
 		}
 	} else {
 		# Phase Two - SP Config Wizard
