@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.12
-	Last Modified	: 05-24-2016
+	Version			: 0.13
+	Last Modified	: 06-14-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -130,7 +130,7 @@ Function WaitReboot() {
 		
 		# Remote Posh
 		while (!$remote) {
-			$remote = New-PSSession -ComputerName $addr
+			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP 
 			Write-Host "."  -NoNewLine
 			Start-Sleep 3
 		}
