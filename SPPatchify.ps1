@@ -621,11 +621,11 @@ Function Main() {
 	# Core steps
 	if (!$phaseTwo) {
 		if ($downloadOnly) {
-			# CMD switch -D
+			# CMD switch -D (download only)
 			PatchMenu
 		} else {
 			if ($copyOnly) {
-				# CMD switch -C
+				# CMD switch -C (copy only)
 				CopyEXE "Copy"
 			} else {
 				# Phase One - patch EXE
@@ -643,7 +643,7 @@ Function Main() {
 			}
 		}
 	} else {
-		# Phase Two - SP Config Wizard
+		# CMD switch -P (phase two) - SP Config Wizard
 		ReadIISPW
 		ChangeContent $false
 		ChangeServices $true
