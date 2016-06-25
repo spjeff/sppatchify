@@ -317,7 +317,7 @@ Function ChangeContent($state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
 		if ($dbs) {
-			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "$root\contentdbs-$when.csv"
+			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "$root\log\contentdbs-$when.csv"
 			$dbs |% {
 				"$($_.Name),$($_.NormalizedDataSource)"
 				Dismount-SPContentDatabase $_ -Confirm:$false
@@ -325,7 +325,7 @@ Function ChangeContent($state) {
 		}
 	} else {
 		# Add content
-		$dbs = Import-Csv "$root\contentdbs-$when.csv"
+		$dbs = Import-Csv "$root\log\contentdbs-$when.csv"
 		# Loop databases
 		$counter = 0
 		$dbs |% {
@@ -664,7 +664,23 @@ Function Main() {
 	# Run duration
 	Write-Host "===== DONE =====" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
-	Write-Host "Duration Total Hours: $th" -Fore Yellow
+	Write-Host "Duration Hours: $th" -Fore Yellow
+	
+	# Add both Phase one and two
+	$regHive = "HKCU:\Software"
+	$regKey = "SPPatchify"
+	$regName = "PhaseOneTotalHours"
+	if (!$phaseTwo) {
+		# create Regkey
+		New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
+		New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th
+	} else {
+		$h = [double]((Get-ItemProperty -Path "$regHive\$regKey")."$regName")
+		$h += $th
+		Write-Host "TOTAL Hours (Phase One and Two): $h" -Fore Yellow
+		Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
+	}
+	
 	Stop-Transcript
 }
 
