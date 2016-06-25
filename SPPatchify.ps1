@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.14
-	Last Modified	: 06-15-2016
+	Version			: 0.15
+	Last Modified	: 06-24-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.14"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.15"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -59,7 +59,8 @@ Function CopyEXE($action) {
 	foreach ($server in $servers) {
 		# Progress
 		$addr = $server.Address
-		Write-Progress -Activity "Copy EXE to " -Status $addr -PercentComplete (($counter/$servers.Count)*100)
+		$prct = [Math]::Round(($counter/$servers.Count)*100)
+		Write-Progress -Activity "Copy EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Skip current machine
@@ -72,7 +73,7 @@ Function CopyEXE($action) {
 					$dest = "\\$addr\$remoteRoot\media"
 					mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null
 					mkdir $dest.replace("media","log") -Force -ErrorAction SilentlyContinue | Out-Null
-					ROBOCOPY "media" $dest /Z /W:0 /R:0 /XX
+					ROBOCOPY "media" $dest /Z /W:0 /R:0 /XX /XN /XO
 				}
 			} else {
 				# Delete
@@ -106,7 +107,8 @@ Function WaitEXE() {
 	foreach ($server in $servers) {	
 		# Progress
 		$addr = $server.Address
-		Write-Progress -Activity "Waiting for " -Status $addr -PercentComplete (($counter/$servers.Count)*100)
+		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		Write-Progress -Activity "Waiting for EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
@@ -133,7 +135,8 @@ Function WaitReboot() {
 	foreach ($server in $servers) {
 		# Progress
 		$addr = $server.Address
-		Write-Progress -Activity "Waiting for " -Status $addr -PercentComplete (($counter/$servers.Count)*100)
+		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		Write-Progress -Activity "Waiting for machine ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
