@@ -67,7 +67,7 @@ Function CopyEXE($action) {
 		if ($addr -ne $env:computername) {
 			if ($action -eq "Copy") {
 				# Copy
-				$files = Get-ChildItem ".\media\*.*"
+				$files = Get-ChildItem "$root\media\*.*"
 				foreach ($file in $files) {
 					$name = $file.Name
 					$dest = "\\$addr\$remoteRoot\media"
@@ -88,7 +88,7 @@ Function StartEXE() {
 	Write-Host "===== StartEXE =====" -Fore Yellow
 	
 	# Build CMD
-	$files = Get-ChildItem ".\media\*.exe"
+	$files = Get-ChildItem "$root\media\*.exe"
 	$name = $files[0].Name
 	$global:patchName = $name.replace(".exe","")
 	$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
@@ -317,15 +317,15 @@ Function ChangeContent($state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
 		if ($dbs) {
-			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "contentdbs-$when.csv"
+			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "$root\contentdbs-$when.csv"
 			$dbs |% {
-				$_.Name
+				"$($_.Name),$($_.NormalizedDataSource)"
 				Dismount-SPContentDatabase $_ -Confirm:$false
 			}
 		}
 	} else {
 		# Add content
-		$dbs = Import-Csv "contentdbs-$when.csv"
+		$dbs = Import-Csv "$root\contentdbs-$when.csv"
 		# Loop databases
 		$counter = 0
 		$dbs |% {
@@ -542,7 +542,7 @@ Function PatchMenu() {
 		Write-Host "SKU = $sku"
 		
 		# Warn if Farm is PROJ and media is not
-		$files = Get-ChildItem ".\media\*prj*.exe"
+		$files = Get-ChildItem "$root\media\*prj*.exe"
 		if ($sku -eq "PROJ" -and !$files) {
 			Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
 			Stop-Transcript
@@ -550,7 +550,7 @@ Function PatchMenu() {
 		}
 		
 		# Halt if have multiple EXE
-		$files = Get-ChildItem ".\media\*.exe"
+		$files = Get-ChildItem "$root\media\*.exe"
 		if ($files -is [System.Array]) {
 			# HALT - multiple EXE found - require clean up before continuing
 			$files | Format-Table -AutoSize
@@ -596,7 +596,7 @@ Function PatchMenu() {
 
 Function DownloadMedia() {
 	# Already have media?  Then skip
-	$files = Get-ChildItem ".\media\*.exe"
+	$files = Get-ChildItem "$root\media\*.exe"
 	if (!$files)	 {
 		# Download media
 		PatchMenu
