@@ -435,7 +435,7 @@ Function ProductLocal() {
 }
 
 Function UpgradeContent() {
-	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore Yellow
 	
 	# upgrade SQL content schema
 	$dbs = Get-SPContentDatabase
