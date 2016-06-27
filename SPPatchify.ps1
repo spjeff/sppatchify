@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.15
-	Last Modified	: 06-25-2016
+	Version			: 0.16
+	Last Modified	: 06-27-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.15"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.16"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -45,7 +45,7 @@ $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 #region binary EXE
 Function CopyEXE($action) {
-	Write-Host "===== $action EXE =====" -Fore Yellow
+	Write-Host "===== $action EXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Remote UNC
 	$char = $root.ToCharArray()
@@ -85,7 +85,7 @@ Function CopyEXE($action) {
 }
 
 Function StartEXE() {
-	Write-Host "===== StartEXE =====" -Fore Yellow
+	Write-Host "===== StartEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Build CMD
 	$files = Get-ChildItem "$root\media\*.exe"
@@ -96,7 +96,7 @@ Function StartEXE() {
 }
 
 Function WaitEXE() {
-	Write-Host "===== WaitEXE =====" -Fore Yellow
+	Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
@@ -124,7 +124,7 @@ Function WaitEXE() {
 }
 
 Function WaitReboot() {
-	Write-Host "===== WaitReboot =====" -Fore Yellow
+	Write-Host "===== WaitReboot ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
@@ -204,7 +204,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 }
 
 Function ChangeDC() {
-	Write-Host "===== ChangeDC OFF =====" -Fore Yellow
+	Write-Host "===== ChangeDC OFF ===== $(Get-Date)" -Fore Yellow
 
 	# Distributed Cache
 	$sb = {
@@ -239,7 +239,7 @@ Function ChangeDC() {
 }
 
 Function ChangeServices($state) {
-	Write-Host "===== ChangeServices $state =====" -Fore Yellow
+	Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore Yellow
 	
 	# Logic core
 	if ($state) {
@@ -311,7 +311,7 @@ Function RunConfigWizard() {
 }
 
 Function ChangeContent($state) {
-	Write-Host "===== ContentDB $state =====" -Fore Yellow
+	Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore Yellow
 
 	if (!$state) {
 		# Remove content
@@ -354,7 +354,7 @@ Function EnablePSRemoting() {
 }
 
 Function ReadIISPW {
-	Write-Host "===== Read IIS PW =====" -Fore Yellow
+	Write-Host "===== Read IIS PW ===== $(Get-Date)" -Fore Yellow
 
 	# Current user (ex: Farm Account)
 	$domain = $env:userdomain
@@ -435,7 +435,7 @@ Function ProductLocal() {
 }
 
 Function UpgradeContent() {
-	Write-Host "===== DONE =====" -Fore Yellow
+	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
 	
 	# upgrade SQL content schema
 	$dbs = Get-SPContentDatabase
@@ -662,7 +662,7 @@ Function Main() {
 	}
 
 	# Run duration
-	Write-Host "===== DONE =====" -Fore Yellow
+	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Hours: $th" -Fore Yellow
 	
