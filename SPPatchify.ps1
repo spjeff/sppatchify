@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.16
-	Last Modified	: 06-27-2016
+	Version			: 0.17
+	Last Modified	: 06-28-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.16"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.17"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -437,20 +437,93 @@ Function ProductLocal() {
 Function UpgradeContent() {
 	Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore Yellow
 	
-	# upgrade SQL content schema
+	# Tracking table - assign DB to server
+	$maxWorkers = 2
+	$track = @()
+	$servers = Get-SPServer |? {$_.Role -eq "Application"}
 	$dbs = Get-SPContentDatabase
-	$counter = 0
-	
-	$dbs |% {
-		$name = $_.Name;
+	$i = 0
+	foreach ($db in $dbs) {
+		# Assign to SPServer
+		$mod = $i % $servers.count
+		$pc = $servers[$mod].Address
 		
-		# Progress
-		$prct =  [Math]::Round(($counter/$dbs.Count)*100)
-		Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
-		$counter++
-		
-		$_ | Upgrade-SPContentDatabase -Confirm:$false
+		# Collect
+		$obj = New-Object -TypeName PSObject -Prop (@{"Name"=$db.Name;"Id"=$db.Id;"UpgradePC"=$pc;"JID"=0;"Status"="New"})
+		$track += $obj
+		$i++
 	}
+
+	# Open sessions
+	Get-PSSession | Remove-PSSession
+	foreach ($server in $servers) {
+		New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP | Out-Null
+	}
+
+	# Monitor and Run loop
+	do {
+		# Get latest PID status
+		$active = $track |? {$_.Status -eq "InProgress"}
+		foreach ($db in $active) {
+			# Monitor remote server job
+			$job = Get-Job $db.JID
+			if ($job.State -eq "Completed") {
+				# Update DB tracking - Complete
+				$db.Status = "Completed"
+			} else {
+				Write-host "-" -NoNewline
+			}
+		}
+		
+		# Ensure workers are active
+		foreach ($server in $servers) {
+			# Count active workers per server
+			$active = $track |? {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address}
+			if ($active.count -lt $maxWorkers) {
+			
+				# Choose next available DB
+				$avail = $track |? {$_.Status -eq "New" -and $_.UpgradePC -eq $server.Address}
+				if ($avail) {
+					if ($avail -is [array]) {
+						$row = $avail[0]
+					} else {
+						$row = $avail
+					}
+				
+					# Kick off new worker
+					$id = $row.Id
+					$name = $row.Name
+					$remoteStr = "`$cmd = New-Object System.Diagnostics.ProcessStartInfo; "+
+						"`$cmd.FileName = 'powershell.exe'; "+
+						"`$internal = Add-PSSnapin Microsoft.SharePoint.Powershell -ErrorAction SilentlyContinue | Out-Null; Upgrade-SPContentDatabase -Id $id -Confirm:`$false; "+
+						"`$cmd.Arguments = '-NoProfile -Command ""$internal""'; "+
+						"[System.Diagnostics.Process]::Start(`$cmd);"
+					
+					# Run on remote server
+					$remoteCmd = [Scriptblock]::Create($remoteStr) 
+					$pc = $server.Address
+					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
+					$result = Invoke-Command $remoteCmd -Session $session -AsJob
+					
+					# Update DB tracking
+					$row.JID = $result.Id
+					$row.Status = "InProgress"
+				}
+				
+				# Progress
+				$counter = $track |? {$_.Status -eq "Completed"}
+				$prct = [Math]::Round(($counter/$track.Count)*100)
+				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
+				$track | group Status | ft
+			}
+		}
+
+		# Latest counter
+		$remain = $track |? {$_.status -ne "Completed"}
+	} while ($remain)
+
+	# Clean up
+	Get-PSSession | Remove-PSSession
 }
 
 Function ShowForm() {
