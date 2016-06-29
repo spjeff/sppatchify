@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.18
+	Version			: 0.19
 	Last Modified	: 06-29-2016
 .LINK
 	Source Code
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.18"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.19"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -633,7 +633,6 @@ Function PatchMenu() {
 		
 		# Prompt for user choice
 		$ver = (Get-SPFarm).BuildVersion.Major
-		$ver = "15"
 		ShowForm
 		
 		# SKU scope
@@ -699,6 +698,7 @@ Function PatchMenu() {
 
 Function DownloadMedia() {
 	# Already have media?  Then skip
+	md "$root\media" -ErrorAction SilentlyContinue | Out-Null
 	$files = Get-ChildItem "$root\media\*.exe"
 	if (!$files)	 {
 		# Download media
