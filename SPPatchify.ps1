@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.17
-	Last Modified	: 06-28-2016
+	Version			: 0.18
+	Last Modified	: 06-29-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.17"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.18"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -152,7 +152,7 @@ Function WaitReboot() {
 Function LocalReboot() {
 	# create Regkey
 	New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name RunOnce -ErrorAction SilentlyContinue | Out-Null
-	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -Force | Out-Null
+	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
 	
 	# Reboot
 	Write-Host " - REBOOTING - "
@@ -453,11 +453,15 @@ Function UpgradeContent() {
 		$track += $obj
 		$i++
 	}
+	$track |ft -a
 
-	# Open sessions
+	# Clean up
 	Get-PSSession | Remove-PSSession
+	Get-Job | Remove-Job
+	
+	# Open sessions
 	foreach ($server in $servers) {
-		New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP | Out-Null
+		New-PSSession -ComputerName $server.Address -Credential $global:cred -Authentication CredSSP | Out-Null
 	}
 
 	# Monitor and Run loop
@@ -466,12 +470,17 @@ Function UpgradeContent() {
 		$active = $track |? {$_.Status -eq "InProgress"}
 		foreach ($db in $active) {
 			# Monitor remote server job
-			$job = Get-Job $db.JID
-			if ($job.State -eq "Completed") {
-				# Update DB tracking - Complete
-				$db.Status = "Completed"
-			} else {
-				Write-host "-" -NoNewline
+			if ($db.JID) {
+				$job = Get-Job $db.JID
+				if ($job.State -eq "Completed") {
+					# Update DB tracking
+					$db.Status = "Completed"
+				} elseif ($job.State -eq "Failed") {
+					# Update DB tracking
+					$db.Status = "Failed"
+				} else {
+					Write-host "-" -NoNewline
+				}
 			}
 		}
 		
@@ -502,8 +511,11 @@ Function UpgradeContent() {
 					# Run on remote server
 					$remoteCmd = [Scriptblock]::Create($remoteStr) 
 					$pc = $server.Address
+					Write-Host $pc -fore green
+					Get-PSSession | ft -a
 					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
 					$result = Invoke-Command $remoteCmd -Session $session -AsJob
+					$result
 					
 					# Update DB tracking
 					$row.JID = $result.Id
@@ -511,19 +523,24 @@ Function UpgradeContent() {
 				}
 				
 				# Progress
-				$counter = $track |? {$_.Status -eq "Completed"}
+				$counter = ($track |? {$_.Status -eq "Completed"}).Count
 				$prct = [Math]::Round(($counter/$track.Count)*100)
 				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
-				$track | group Status | ft
+				$track | ft -a
+				Sleep 1
 			}
 		}
 
 		# Latest counter
-		$remain = $track |? {$_.status -ne "Completed"}
+		$remain = $track |? {$_.status -ne "Completed" -and $_.status -ne "Failed"}
 	} while ($remain)
-
+	Write-Host "===== Upgrade Content Databases DONE ====="
+	$track | group status | ft -a
+	$track | ft -a
+	
 	# Clean up
 	Get-PSSession | Remove-PSSession
+	Get-Job | Remove-Job
 }
 
 Function ShowForm() {
@@ -733,7 +750,7 @@ Function Main() {
 		IISStart
 		DisplayCA
 	}
-
+	
 	# Run duration
 	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
@@ -746,7 +763,7 @@ Function Main() {
 	if (!$phaseTwo) {
 		# create Regkey
 		New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
-		New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th
+		New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
 	} else {
 		$h = [double]((Get-ItemProperty -Path "$regHive\$regKey")."$regName")
 		$h += $th
