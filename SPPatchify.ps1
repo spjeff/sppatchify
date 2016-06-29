@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.20
+	Version			: 0.21
 	Last Modified	: 06-29-2016
 .LINK
 	Source Code
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.20"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.21"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -88,14 +88,28 @@ Function StartEXE() {
 	Write-Host "===== StartEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Build CMD
+	$ver = (Get-SPFarm).BuildVersion.Major
 	$files = Get-ChildItem "$root\media\*.exe"
-	$name = $files[0].Name
-	$global:patchName = $name.replace(".exe","")
-	$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
-	LoopRemoteCmd "Run EXE on " $cmd
+	foreach ($f in $files) {
+		$name = $f.Name
+		$patchName = $name.replace(".exe","")
+		$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
+		if ($ver -eq 16) {
+			$cmd = $cmd.replace("/forcerestart","/norestart")
+		}
+		LoopRemoteCmd "Run EXE on " $cmd
+		WaitEXE $patchName
+	}
+	
+	# Reboot
+	if ($ver -eq 16) {
+		foreach ($server in $servers) {
+			Restart-Computer -ComputerName $server.Address
+		}
+	}
 }
 
-Function WaitEXE() {
+Function WaitEXE($patchName) {
 	Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
@@ -116,7 +130,7 @@ Function WaitEXE() {
 		Write-Host "`nEXE started on $addr at $when " -NoNewLine
 		do {
 			# Monitor EXE process
-			$proc = Get-Process -Name $global:patchName -Computer $addr -ErrorAction SilentlyContinue
+			$proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
 			Write-Host "."  -NoNewLine
 			Start-Sleep 3
 		} while ($proc)
@@ -453,7 +467,6 @@ Function UpgradeContent() {
 	# Tracking table - assign DB to server
 	$maxWorkers = 4
 	$track = @()
-	$servers = Get-SPServer |? {$_.Role -eq "Application"}
 	$dbs = Get-SPContentDatabase
 	$i = 0
 	foreach ($db in $dbs) {
@@ -725,7 +738,7 @@ Function Main() {
 
 	# Local farm
 	(Get-SPFarm).BuildVersion
-	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
+	$servers = Get-SPServer |? {$_.Role -eq "Application"} | Sort Address
 
 	# Core steps
 	if (!$phaseTwo) {
@@ -746,7 +759,6 @@ Function Main() {
 				ChangeServices $false
 				IISStart
 				StartEXE
-				WaitEXE
 				WaitReboot
 				LocalReboot
 			}
