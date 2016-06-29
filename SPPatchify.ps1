@@ -629,6 +629,7 @@ Function PatchMenu() {
 		
 		# Overwrite if downloaded OK
 		Copy-Item $dest $local -Force
+		Remove-Item $dest
 		$csv = Import-Csv $local
 		
 		# SKU - SharePoint or Project?
