@@ -451,7 +451,7 @@ Function UpgradeContent() {
 	Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore Yellow
 	
 	# Tracking table - assign DB to server
-	$maxWorkers = 2
+	$maxWorkers = 4
 	$track = @()
 	$servers = Get-SPServer |? {$_.Role -eq "Application"}
 	$dbs = Get-SPContentDatabase
