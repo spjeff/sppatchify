@@ -636,7 +636,7 @@ Function PatchMenu() {
 		$sku = "SP"
 		$ver = (Get-SPFarm).BuildVersion.Major
 		if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
-			if ($ver -eq "15") {
+			if ($ver -eq 15) {
 				$sku = "PROJ"
 			}
 		}
@@ -654,7 +654,7 @@ Function PatchMenu() {
 		
 		# Halt if have multiple EXE
 		$files = Get-ChildItem "$root\media\*.exe"
-		if ($files -is [System.Array]) {
+		if ($files -is [System.Array] -and $ver -ne 16) {
 			# HALT - multiple EXE found - require clean up before continuing
 			$files | Format-Table -AutoSize
 			Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
