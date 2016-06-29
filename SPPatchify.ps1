@@ -56,10 +56,10 @@ Function CopyEXE($action) {
 
 	# Loop servers
 	$counter = 0
-	foreach ($server in $servers) {
+	foreach ($server in $global:servers) {
 		# Progress
 		$addr = $server.Address
-		$prct = [Math]::Round(($counter/$servers.Count)*100)
+		$prct = [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity "Copy EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
@@ -103,7 +103,7 @@ Function StartEXE() {
 	
 	# Reboot
 	if ($ver -eq 16) {
-		foreach ($server in $servers) {
+		foreach ($server in $global:servers) {
 			Restart-Computer -ComputerName $server.Address
 		}
 	}
@@ -118,10 +118,10 @@ Function WaitEXE($patchName) {
 
 	# Verify machines online
 	$counter = 0
-	foreach ($server in $servers) {	
+	foreach ($server in $global:servers) {	
 		# Progress
 		$addr = $server.Address
-		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity "Waiting for EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
@@ -146,10 +146,10 @@ Function WaitReboot() {
 	
 	# Verify machines online
 	$counter = 0
-	foreach ($server in $servers) {
+	foreach ($server in $global:servers) {
 		# Progress
 		$addr = $server.Address
-		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity "Waiting for machine ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
@@ -184,7 +184,7 @@ Function LocalReboot() {
 Function LoopRemoteCmd($msg, $cmd) {
 	# Loop servers
 	$counter = 0
-	foreach ($server in $servers) {
+	foreach ($server in $global:servers) {
 
 		# Script block
 		if ($cmd.GetType().Name -eq "String") {
@@ -200,7 +200,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 	
 		# Progress
 		$addr = $server.Address
-		$prct =  [Math]::Round(($counter/$servers.Count)*100)
+		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
 		$counter++
 		
@@ -471,8 +471,8 @@ Function UpgradeContent() {
 	$i = 0
 	foreach ($db in $dbs) {
 		# Assign to SPServer
-		$mod = $i % $servers.count
-		$pc = $servers[$mod].Address
+		$mod = $i % $global:servers.count
+		$pc = $global:servers[$mod].Address
 		
 		# Collect
 		$obj = New-Object -TypeName PSObject -Prop (@{"Name"=$db.Name;"Id"=$db.Id;"UpgradePC"=$pc;"JID"=0;"Status"="New"})
@@ -486,7 +486,7 @@ Function UpgradeContent() {
 	Get-Job | Remove-Job
 	
 	# Open sessions
-	foreach ($server in $servers) {
+	foreach ($server in $global:servers) {
 		New-PSSession -ComputerName $server.Address -Credential $global:cred -Authentication CredSSP | Out-Null
 	}
 
@@ -511,7 +511,7 @@ Function UpgradeContent() {
 		}
 		
 		# Ensure workers are active
-		foreach ($server in $servers) {
+		foreach ($server in $global:servers) {
 			# Count active workers per server
 			$active = $track |? {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address}
 			if ($active.count -lt $maxWorkers) {
@@ -738,7 +738,7 @@ Function Main() {
 
 	# Local farm
 	(Get-SPFarm).BuildVersion
-	$servers = Get-SPServer |? {$_.Role -eq "Application"} | Sort Address
+	$global:servers = Get-SPServer |? {$_.Role -eq "Application"} | Sort Address
 
 	# Core steps
 	if (!$phaseTwo) {
