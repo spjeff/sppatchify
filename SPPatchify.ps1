@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.19
+	Version			: 0.20
 	Last Modified	: 06-29-2016
 .LINK
 	Source Code
@@ -37,7 +37,7 @@ param (
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.19"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.20"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -556,7 +556,7 @@ Function UpgradeContent() {
 	Get-Job | Remove-Job
 }
 
-Function ShowForm() {
+Function ShowForm($prod) {
 	# Load DLL
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
 	$local = "$root\SPPatchify-Download-CU.csv"
@@ -580,7 +580,7 @@ Function ShowForm() {
 
 	# Drop Down
 	$selMonth = New-Object System.Windows.Forms.ComboBox
-	foreach ($c in ($csv | Sort Year,Month -Desc | Select Year,Month -Unique)) {
+	foreach ($c in ($csv |? {$_.Product -eq $prod} | Sort Year,Month -Desc | Select Year,Month -Unique)) {
 		$row = $c.Year + " " + (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($c.Month)
 		if (!$text) {$text = $row}
 		$selMonth.Items.add($row) | Out-Null
@@ -631,17 +631,17 @@ Function PatchMenu() {
 		Copy-Item $dest $local -Force
 		$csv = Import-Csv $local
 		
-		# Prompt for user choice
+		# SKU - SharePoint or Project?
+		$sku = "SP"
 		$ver = (Get-SPFarm).BuildVersion.Major
-		ShowForm
-		
-		# SKU scope
 		if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
-			$sku = "PROJ"
-		} else {
-			$sku = "SP"
+			if ($ver -eq "15") {
+				$sku = "PROJ"
+			}
 		}
-		Write-Host "SKU = $sku"
+		$prod = "$sku$ver"
+		Write-Host "Product = $prod"
+		ShowForm $prod
 		
 		# Warn if Farm is PROJ and media is not
 		$files = Get-ChildItem "$root\media\*prj*.exe"
