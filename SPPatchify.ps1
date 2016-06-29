@@ -391,13 +391,26 @@ Function ReadIISPW {
 }
 
 Function DisplayCA() {
-	# version table	
+	# version DLL File
 	$sb = {
-		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null;
 		$ver = (Get-SPFarm).BuildVersion.Major;
 		[System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion,@{N='PC'; E={$env:computername}}
 	}
 	LoopRemoteCmd "Get file version on " $sb
+	
+	# version Max Patch
+	$maxv = 0
+	$f = Get-SPFarm
+	$p = Get-SPProduct
+	foreach ($u in $p.PatchableUnitDisplayNames) {
+		$n = $_
+		$v = ($p.GetPatchableUnitInfoByDisplayName($n).patches | sort version -desc)[0].version
+		if (!$maxv) {$maxv = $v}
+		if ($v -gt $maxv) {$maxv = $v}
+	}
+	Write-Host "SKU Product Max Ver = $maxv"
+	Write-Host "SKU Farm Ver = $($f.BuildVersion)"
 	
 	# open Central Admin
 	$ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication}
