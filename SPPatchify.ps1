@@ -40,11 +40,12 @@ param (
 	[switch]$showVersion
 )
 
-# Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.22"
-
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+
+# Version
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.22"
+$rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
 #region binary EXE
@@ -752,6 +753,22 @@ Function DownloadMedia() {
 		$files |Format-Table -Auto
 	}
 }
+
+Function DetectAdmin() {
+	$wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+	$prp = New-Object System.Security.Principal.WindowsPrincipal($wid)
+	$adm = [System.Security.Principal.WindowsBuiltInRole]::Administrator
+	$IsAdmin = $prp.IsInRole($adm)
+	if (!$IsAdmin) {
+		(Get-Host).UI.RawUI.Backgroundcolor = "DarkRed"
+		Clear-Host
+		Write-Host "===== SPPatchify - Not Running as Administrator =====`nStarting an elevated PowerShell window...`n"
+		$arguments = "& '" + $rootCmd + "' -p"
+		$arguments
+		Start-Process powershell -Verb runAs -ArgumentList $arguments
+		Break
+	}
+}
 #endregion
 
 Function Main() {
@@ -771,6 +788,7 @@ Function Main() {
 	# Params
 	Write-Host "copyOnly = $copyOnly"
 	Write-Host "phaseTwo = $phaseTwo"
+	Write-Host "***"
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
@@ -800,6 +818,7 @@ Function Main() {
 		}
 	} else {
 		# CMD switch -P (phase two) - SP Config Wizard
+		DetectAdmin
 		ReadIISPW
 		ChangeContent $false
 		ChangeServices $true
