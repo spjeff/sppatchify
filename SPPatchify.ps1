@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.21
-	Last Modified	: 06-29-2016
+	Version			: 0.22
+	Last Modified	: 06-30-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -33,11 +33,15 @@ param (
 	
 	[Parameter(Mandatory=$False, Position=2, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
 	[Alias("p")]
-	[switch]$phaseTwo
+	[switch]$phaseTwo,
+	
+	[Parameter(Mandatory=$False, Position=3, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+	[Alias("v")]
+	[switch]$showVersion
 )
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.21"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.22"
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -104,7 +108,9 @@ Function StartEXE() {
 	# Reboot
 	if ($ver -eq 16) {
 		foreach ($server in $global:servers) {
-			Restart-Computer -ComputerName $server.Address
+			if ($server.Address -ne $env:computername) {
+				Restart-Computer -ComputerName $server.Address
+			}
 		}
 	}
 }
@@ -138,11 +144,14 @@ Function WaitEXE($patchName) {
 }
 
 Function WaitReboot() {
-	Write-Host "===== WaitReboot ===== $(Get-Date)" -Fore Yellow
+	Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
 	Write-Host "Wait 30 sec..."
 	Start-Sleep 30
+	
+	#Clean up
+	Get-PSSession | Remove-PSSession
 	
 	# Verify machines online
 	$counter = 0
@@ -155,11 +164,16 @@ Function WaitReboot() {
 		
 		# Remote Posh
 		while (!$remote) {
-			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP 
+			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
+			if (!$remote) {
+				$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
+			}
 			Write-Host "."  -NoNewLine
 			Start-Sleep 3
 		}
 	}
+	
+	#Clean up
 	Get-PSSession | Remove-PSSession
 }
 
@@ -169,7 +183,7 @@ Function LocalReboot() {
 	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
 	
 	# Reboot
-	Write-Host " - REBOOTING - "
+	Write-Host "`n ===== REBOOT LOCAL ===== "
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
@@ -182,6 +196,9 @@ Function LocalReboot() {
 
 #region SP Config Wizard
 Function LoopRemoteCmd($msg, $cmd) {
+	#Clean up
+	Get-PSSession | Remove-PSSession
+	
 	# Loop servers
 	$counter = 0
 	foreach ($server in $global:servers) {
@@ -205,7 +222,10 @@ Function LoopRemoteCmd($msg, $cmd) {
 		$counter++
 		
 		# Remote Posh
-		$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP
+		$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
+		if (!$remote) {
+			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
+		}
         Start-Sleep 3
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
@@ -215,6 +235,9 @@ Function LoopRemoteCmd($msg, $cmd) {
 		Write-Host "<< complete on $addr" -Fore Green
 	}
 	Write-Progress -Activity "Completed" -Completed	
+	
+	#Clean up
+	Get-PSSession | Remove-PSSession
 }
 
 Function ChangeDC() {
@@ -413,25 +436,28 @@ Function DisplayCA() {
 	}
 	LoopRemoteCmd "Get file version on " $sb
 	
-	# version Max Patch
-	$maxv = 0
-	$f = Get-SPFarm
-	$p = Get-SPProduct
-	foreach ($u in $p.PatchableUnitDisplayNames) {
-		$n = $_
-		$v = ($p.GetPatchableUnitInfoByDisplayName($n).patches | sort version -desc)[0].version
-		if (!$maxv) {$maxv = $v}
-		if ($v -gt $maxv) {$maxv = $v}
-	}
-	Write-Host "SKU Product Max Ver = $maxv"
-	Write-Host "SKU Farm Ver = $($f.BuildVersion)"
+	# display Version
+	DisplayVersion
 	
 	# open Central Admin
 	$ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication}
 	$pages = @("PatchStatus.aspx","UpgradeStatus.aspx","FarmServers.aspx")
 	$pages |% {start ($ca.Url + "_admin/" + $_)}
 }
-
+Function DisplayVersion() {
+	# version Max Patch
+	$maxv = 0
+	$f = Get-SPFarm
+	$p = Get-SPProduct
+	foreach ($u in $p.PatchableUnitDisplayNames) {
+		$n = $u
+		$v = ($p.GetPatchableUnitInfoByDisplayName($n).patches | sort version -desc)[0].version
+		if (!$maxv) {$maxv = $v}
+		if ($v -gt $maxv) {$maxv = $v}
+	}
+	Write-Host "Max Product = $maxv"
+	Write-Host "Farm Build  = $($f.BuildVersion)"
+}
 Function IISStart() {
 	# start IIS pools and sites
 	$sb = {
@@ -487,7 +513,11 @@ Function UpgradeContent() {
 	
 	# Open sessions
 	foreach ($server in $global:servers) {
-		New-PSSession -ComputerName $server.Address -Credential $global:cred -Authentication CredSSP | Out-Null
+		$addr = $server.Address
+		$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
+		if (!$remote) {
+			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue 
+		}
 	}
 
 	# Monitor and Run loop
@@ -725,6 +755,12 @@ Function DownloadMedia() {
 #endregion
 
 Function Main() {
+	# display Version
+	if ($showVersion) {
+		DisplayVersion
+		exit
+	}
+	
 	# Start time
 	$start = Get-Date
 	$when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
@@ -736,9 +772,8 @@ Function Main() {
 	Write-Host "copyOnly = $copyOnly"
 	Write-Host "phaseTwo = $phaseTwo"
 
-	# Local farm
-	(Get-SPFarm).BuildVersion
-	$global:servers = Get-SPServer |? {$_.Role -eq "Application"} | Sort Address
+	# Local farm servers
+	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
 
 	# Core steps
 	if (!$phaseTwo) {
@@ -791,8 +826,11 @@ Function Main() {
 		New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
 		New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
 	} else {
-		$h = [double]((Get-ItemProperty -Path "$regHive\$regKey")."$regName")
-		$h += $th
+		$thKey = Get-ItemProperty -Path "$regHive\$regKey"
+		if ($thKey) {
+			$h = [double]($thKey."$regName")
+			$h += $th
+		}
 		Write-Host "TOTAL Hours (Phase One and Two): $h" -Fore Yellow
 		Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
 	}
