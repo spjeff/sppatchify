@@ -845,7 +845,7 @@ Function Main() {
 		New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
 		New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
 	} else {
-		$thKey = Get-ItemProperty -Path "$regHive\$regKey"
+		$thKey = Get-ItemProperty -Path "$regHive\$regKey" -ErrorAction SilentlyContinue
 		if ($thKey) {
 			$h = [double]($thKey."$regName")
 			$h += $th
