@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.22
-	Last Modified	: 06-30-2016
+	Version			: 0.23
+	Last Modified	: 07-05-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -572,7 +572,6 @@ Function UpgradeContent() {
 					Get-PSSession | ft -a
 					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
 					$result = Invoke-Command $remoteCmd -Session $session -AsJob
-					$result
 					
 					# Update DB tracking
 					$row.JID = $result.Id
@@ -584,7 +583,7 @@ Function UpgradeContent() {
 				$prct = [Math]::Round(($counter/$track.Count)*100)
 				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
 				$track | ft -a
-				Sleep 1
+				Sleep 3
 			}
 		}
 
