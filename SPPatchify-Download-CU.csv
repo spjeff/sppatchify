@@ -45,3 +45,7 @@ Year,Month,Product,URL
 2016,5,PROJ14,https://download.microsoft.com/download/4/C/D/4CD0ACF0-A584-486C-B5C1-A3CDF61CB96F/ubersrvprj2010-kb3115122-fullfile-x64-glb.exe
 2016,4,PROJ14,https://download.microsoft.com/download/7/8/1/7815ECC9-CB63-4810-B32B-36420A70E14A/ubersrvprj2010-kb3114992-fullfile-x64-glb.exe
 2016,5,PROJ14,https://download.microsoft.com/download/4/A/B/4AB7D00A-EC7B-464A-9CE3-E839727626ED/ubersrv_2.cab
+2015,SP1,SP15,https://download.microsoft.com/download/7/A/8/7A84E002-6512-4506-A812-CA66FF6766D9/officeserversp2013-kb2880552-fullfile-x64-en-us.exe
+2015,SP1,PROJ15,https://download.microsoft.com/download/9/6/6/966D7B78-77BF-44D7-B97D-C8592812BB73/projectserversp2013-kb2880553-fullfile-x64-en-us.exe
+2015,SP2,SP14,https://download.microsoft.com/download/9/B/F/9BFC169F-BEFD-4344-B1EC-24CCF34570C0/oserversp2010-kb2687453-fullfile-x64-en-us.exe
+2015,SP2,PROJ14,https://download.microsoft.com/download/7/0/4/7041CD79-7AD5-480B-8DC4-CAD2695C425A/svrprjsp2010-kb2687452-fullfile-x64-en-us.exe
