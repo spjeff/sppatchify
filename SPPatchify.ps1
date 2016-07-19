@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.23
-	Last Modified	: 07-05-2016
+	Version			: 0.24
+	Last Modified	: 07-19-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,19 +23,23 @@
 
 [CmdletBinding()]
 param (
-	[Parameter(Mandatory=$False, Position=0, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
 	[Alias("c")]
 	[switch]$copyOnly,
 	
-	[Parameter(Mandatory=$False, Position=1, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
 	[Alias("d")]
 	[switch]$downloadOnly,
 	
-	[Parameter(Mandatory=$False, Position=2, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+	[Alias("prod")]
+	[string]$downloadProduct,
+	
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
 	[Alias("p")]
 	[switch]$phaseTwo,
 	
-	[Parameter(Mandatory=$False, Position=3, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
 	[Alias("v")]
 	[switch]$showVersion
 )
@@ -44,7 +48,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.22"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.24"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
@@ -506,7 +510,7 @@ Function UpgradeContent() {
 		$track += $obj
 		$i++
 	}
-	$track |ft -a
+	$track | Format-Table -Auto
 
 	# Clean up
 	Get-PSSession | Remove-PSSession
@@ -601,13 +605,14 @@ Function UpgradeContent() {
 
 Function ShowForm($prod) {
 	# Load DLL
+	$global:selmonth = ""
 	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
 	$local = "$root\SPPatchify-Download-CU.csv"
 	$csv = Import-Csv $local
 
 	# WinForm
 	$form = New-Object System.Windows.Forms.Form
-	$form.Text = 'Select Month'
+	$form.Text = "Select Month - $prod"
 	$form.Size = New-Object System.Drawing.Size(260,180)
 	$form.MaximizeBox = $false
 	$form.MinimizeBox = $false
@@ -623,8 +628,9 @@ Function ShowForm($prod) {
 
 	# Drop Down
 	$selMonth = New-Object System.Windows.Forms.ComboBox
-	foreach ($c in ($csv |? {$_.Product -eq $prod} | Sort Year,Month -Desc | Select Year,Month -Unique)) {
-		$row = $c.Year + " " + (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($c.Month)
+	$choices = $csv |? {$_.Product -eq $prod} | Sort Year,Month -Desc | Select Year,Month -Unique
+	foreach ($c in $choices) {
+		$row = $c.Year + " " + (getMonth($c.Month))
 		if (!$text) {$text = $row}
 		$selMonth.Items.add($row) | Out-Null
 	}
@@ -653,90 +659,101 @@ Function ShowForm($prod) {
 	$res = $form.ShowDialog()
 }
 
+Function GetMonth($mo) {
+	try {
+		$mo = (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($mo)
+	} catch {
+		return $mo
+	}
+	return $mo
+}
+
 Function GetMonthInt($name) {
 	1..12 |% {
 		if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
 			return $_
 		}
 	}
+	return $name
 }
 
 Function PatchMenu() {
-	try {
-		# Download CSV of patches
-		$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
-		$local = "$root\SPPatchify-Download-CU.csv"
-		$wc = New-Object System.Net.Webclient
-		$dest = $local.Replace(".csv","-temp.csv")
-		$wc.DownloadFile($source, $dest)
-		
-		# Overwrite if downloaded OK
-		Copy-Item $dest $local -Force
-		Remove-Item $dest
-		$csv = Import-Csv $local
-		
-		# SKU - SharePoint or Project?
-		$sku = "SP"
-		$ver = (Get-SPFarm).BuildVersion.Major
-		if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
-			if ($ver -eq 15) {
-				$sku = "PROJ"
-			}
+	# ensure folder
+	md "$root\media" -ErrorAction SilentlyContinue | Out-Null
+	
+	# Download CSV of patches
+	$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
+	$local = "$root\SPPatchify-Download-CU.csv"
+	$wc = New-Object System.Net.Webclient
+	$dest = $local.Replace(".csv","-temp.csv")
+	$wc.DownloadFile($source, $dest)
+	
+	# Overwrite if downloaded OK
+	Copy-Item $dest $local -Force
+	Remove-Item $dest
+	$csv = Import-Csv $local
+	
+	# SKU - SharePoint or Project?
+	$sku = "SP"
+	$ver = "15"
+	$ver = (Get-SPFarm).BuildVersion.Major
+	if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
+		if ($ver -ne 16) {
+			$sku = "PROJ"
 		}
-		$prod = "$sku$ver"
-		Write-Host "Product = $prod"
-		ShowForm $prod
-		
-		# Warn if Farm is PROJ and media is not
-		$files = Get-ChildItem "$root\media\*prj*.exe"
-		if ($sku -eq "PROJ" -and !$files) {
-			Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
-			Stop-Transcript
-			Exit
-		}
-		
-		# Halt if have multiple EXE
-		$files = Get-ChildItem "$root\media\*.exe"
-		if ($files -is [System.Array] -and $ver -ne 16) {
-			# HALT - multiple EXE found - require clean up before continuing
-			$files | Format-Table -AutoSize
-			Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
-			Stop-Transcript
-			Exit
-		}
-		
-		# Filter CSV for file names
-		$year = $global:selmonth.Split(" ")[0]
-		$month = GetMonthInt $global:selmonth.Split(" ")[1]
-		$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
-		$patchFiles | ft -a
-		
-		# Download patch media
-		$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
-		foreach ($file in $patchFiles) {
-			# Parameters
-			$splits = $file.URL.Split("/")
-			$name = $splits[$splits.Count - 1]
-			$dest = "$root\media\$name"
+	}
+	$prod = "$sku$ver"
+	if ($downloadProduct) {$prod = $downloadProduct}
+	Write-Host "Product = $prod"
+	ShowForm $prod
+	
+	# Halt if Farm is PROJ and media is not
+	$files = Get-ChildItem "$root\media\*prj*.exe"
+	if ($sku -eq "PROJ" -and !$files) {
+		Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
+		Stop-Transcript
+		Exit
+	}
+	
+	# Halt if have multiple EXE
+	$files = Get-ChildItem "$root\media\*.exe"
+	if ($files -is [System.Array] -and $ver -ne 16) {
+		# HALT - multiple EXE found - require clean up before continuing
+		$files | Format-Table -AutoSize
+		Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
+		Stop-Transcript
+		Exit
+	}
+	
+	# Filter CSV for file names
+	Write-Host "SELECTED = $($global:selmonth)" -Fore Yellow
+	$year = $global:selmonth.Split(" ")[0]
+	$month = GetMonthInt $global:selmonth.Split(" ")[1]
+	$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
+	$patchFiles | Format-Table -Auto
+	
+	# Download patch media
+	$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
+	foreach ($file in $patchFiles) {
+		# Parameters
+		$splits = $file.URL.Split("/")
+		$name = $splits[$splits.Count - 1]
+		$dest = "$root\media\$name"
 
-			if (Test-Path $dest) {
-				Write-Host "Found $name"
+		if (Test-Path $dest) {
+			Write-Host "Found $name"
+		} else {
+			Write-Host "Downloading $name"
+			if ($bits) {
+				# pefer BITS
+				 Write-Host "BITS $dest"
+				Start-BitsTransfer -Source $file.URL -Destination $dest
 			} else {
-				Write-Host "Downloading $name"
-				if ($bits) {
-					# pefer BITS
-					 Write-Host "BITS $dest"
-					Start-BitsTransfer -Source $file.URL -Destination $dest
-				} else {
-					# Dot Net
-					Write-Host "WebClient $dest"
-					(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
-				}
+				# Dot Net
+				Write-Host "WebClient $dest"
+				(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
 			}
 		}
-	} catch {
-		# Error downloading
-		Write-Host "Error - Unable to download.  Please verify proxy server and Internet connection." -Fore Red
 	}
 }
 
@@ -771,7 +788,13 @@ Function DetectAdmin() {
 #endregion
 
 Function Main() {
-	# display Version
+	# download media
+	if ($downloadOnly) {
+		PatchMenu
+		exit
+	}
+	
+	# display version
 	if ($showVersion) {
 		DisplayVersion
 		exit
@@ -783,37 +806,36 @@ Function Main() {
 	$logFile = "$root\log\SPPatchify-$when.txt"
 	mkdir "$root\log" -ErrorAction SilentlyContinue | Out-Null
 	Start-Transcript $logFile
-	
+		
 	# Params
+	Write-Host "=== PARAMS ==="
 	Write-Host "copyOnly = $copyOnly"
 	Write-Host "phaseTwo = $phaseTwo"
-	Write-Host "***"
+	Write-Host "downloadOnly = $downloadOnly"
+	Write-Host "downloadProduct = $downloadProduct"
+	Write-Host "showVersion = $showVersion"
+	Write-Host "==="
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
 
 	# Core steps
 	if (!$phaseTwo) {
-		if ($downloadOnly) {
-			# CMD switch -D (download only)
-			PatchMenu
+		if ($copyOnly) {
+			# CMD switch -C (copy only)
+			CopyEXE "Copy"
 		} else {
-			if ($copyOnly) {
-				# CMD switch -C (copy only)
-				CopyEXE "Copy"
-			} else {
-				# Phase One - patch EXE
-				DownloadMedia
-				EnablePSRemoting
-				ReadIISPW
-				CopyEXE "Copy"
-				ChangeDC
-				ChangeServices $false
-				IISStart
-				StartEXE
-				WaitReboot
-				LocalReboot
-			}
+			# Phase One - patch EXE
+			DownloadMedia
+			EnablePSRemoting
+			ReadIISPW
+			CopyEXE "Copy"
+			ChangeDC
+			ChangeServices $false
+			IISStart
+			StartEXE
+			WaitReboot
+			LocalReboot
 		}
 	} else {
 		# CMD switch -P (phase two) - SP Config Wizard
