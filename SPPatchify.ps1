@@ -359,7 +359,7 @@ Function ChangeContent($state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
 		if ($dbs) {
-			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,{$wa}} | Export-Csv "$root\log\contentdbs-$when.csv"
+			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv"
 			$dbs |% {
 				"$($_.Name),$($_.NormalizedDataSource)"
 				Dismount-SPContentDatabase $_ -Confirm:$false
@@ -379,7 +379,7 @@ Function ChangeContent($state) {
 			Write-Progress -Activity "Add database" -Status "$name ($prct %)" -PercentComplete $prct
 			$counter++
 		
-			Mount-SPContentDatabase -WebApplication $_."`$wa" -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+			Mount-SPContentDatabase -WebApplication $_.WebApp -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
 		}
 	}
 }
