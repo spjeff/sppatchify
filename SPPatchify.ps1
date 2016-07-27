@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.24
-	Last Modified	: 07-19-2016
+	Version			: 0.25
+	Last Modified	: 07-27-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -412,17 +412,34 @@ Function ReadIISPW {
 	}
 	
 	# Attempt to detect password from IIS Pool (if current user is local admin and farm account)
-	$appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | Select-Object WAMUserName, WAMUserPass
-	foreach ($pool in $appPools) {	
-		if ($pool.WAMUserName -like "*$user") {
-			Write-Host "Found - "$pool.WAMUserName
-			$pass = $pool.WAMUserPass
-			if ($pass) {
-				break
+	Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
+	$m = Get-Module WebAdministration
+	if ($m) {
+		#PowerShell ver 2.0+ IIS technique
+		$appPools = Get-ChildItem "IIS:\AppPools\"
+		foreach ($pool in $appPools) {	
+			if ($pool.processModel.userName -like "*$user") {
+				Write-Host "Found - "$pool.processModel.userName
+				$pass = $pool.processModel.password
+				if ($pass) {
+					break
+				}
+			}
+		}
+	} else {
+		#PowerShell ver 3.0+ WMI technique
+		$appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | Select-Object WAMUserName, WAMUserPass
+		foreach ($pool in $appPools) {	
+			if ($pool.WAMUserName -like "*$user") {
+				Write-Host "Found - "$pool.WAMUserName
+				$pass = $pool.WAMUserPass
+				if ($pass) {
+					break
+				}
 			}
 		}
 	}
-	
+
 	# Prompt for password
 	if (!$pass) {
 		$sec = Read-Host "Enter password: " -AsSecureString
