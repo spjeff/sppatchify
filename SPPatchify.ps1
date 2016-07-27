@@ -486,7 +486,7 @@ Function IISStart() {
         Import-Module WebAdministration
 
         # IISAdmin
-        $iisadmin = Get-Service IISADMIN
+        $iisadmin = Get-Service "IISADMIN"
         if ($iisadmin) {
 			Set-Service -Name $iisadmin -StartupType Automatic -ErrorAction SilentlyContinue
 			Start-Service $iisadmin -ErrorAction SilentlyContinue
@@ -494,7 +494,7 @@ Function IISStart() {
 
         # W3WP
 		Start-Service w3svc | Out-Null
-		Get-ChildItem IIS:\AppPools |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
+		Get-ChildItem "IIS:\AppPools\" |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
 		Get-WebSite | Start-WebSite | Out-Null
 	}
 	LoopRemoteCmd "Start IIS on " $sb
