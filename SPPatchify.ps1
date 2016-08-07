@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.25
-	Last Modified	: 07-27-2016
+	Version			: 0.26
+	Last Modified	: 08-07-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -86,7 +86,7 @@ Function CopyEXE($action) {
 				}
 			} else {
 				# Delete
-				del "\\$addr\$remoteRoot\media\*.*" -confirm:$false
+				Remove-Item "\\$addr\$remoteRoot\media\*.*" -confirm:$false
 			}
 		}
 	}
@@ -98,7 +98,7 @@ Function StartEXE() {
 	
 	# Build CMD
 	$ver = (Get-SPFarm).BuildVersion.Major
-	$files = Get-ChildItem "$root\media\*.exe"
+	$files = Get-ChildItem "$root\media\*.exe" | sort Name
 	foreach ($f in $files) {
 		$name = $f.Name
 		$patchName = $name.replace(".exe","")
@@ -359,7 +359,7 @@ Function ChangeContent($state) {
 		# Remove content
 		$dbs = Get-SPContentDatabase
 		if ($dbs) {
-			$dbs |% {$wa = $_.WebApplication.Url; $_ | Select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv"
+			$dbs |% {$wa = $_.WebApplication.Url; $_ | select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv"
 			$dbs |% {
 				"$($_.Name),$($_.NormalizedDataSource)"
 				Dismount-SPContentDatabase $_ -Confirm:$false
@@ -428,7 +428,7 @@ Function ReadIISPW {
 		}
 	} else {
 		#PowerShell ver 3.0+ WMI technique
-		$appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | Select-Object WAMUserName, WAMUserPass
+		$appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | select WAMUserName, WAMUserPass
 		foreach ($pool in $appPools) {	
 			if ($pool.WAMUserName -like "*$user") {
 				Write-Host "Found - "$pool.WAMUserName
@@ -464,7 +464,7 @@ Function DisplayCA() {
 	# open Central Admin
 	$ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication}
 	$pages = @("PatchStatus.aspx","UpgradeStatus.aspx","FarmServers.aspx")
-	$pages |% {start ($ca.Url + "_admin/" + $_)}
+	$pages |% {Start-Process ($ca.Url + "_admin/" + $_)}
 }
 Function DisplayVersion() {
 	# version Max Patch
@@ -590,7 +590,7 @@ Function UpgradeContent() {
 					$remoteCmd = [Scriptblock]::Create($remoteStr) 
 					$pc = $server.Address
 					Write-Host $pc -fore green
-					Get-PSSession | ft -a
+					Get-PSSession | Format-Table -AutoSize
 					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
 					$result = Invoke-Command $remoteCmd -Session $session -AsJob
 					
@@ -603,8 +603,8 @@ Function UpgradeContent() {
 				$counter = ($track |? {$_.Status -eq "Completed"}).Count
 				$prct = [Math]::Round(($counter/$track.Count)*100)
 				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
-				$track | ft -a
-				Sleep 3
+				$track | Format-Table -AutoSize
+				Start-Sleep 3
 			}
 		}
 
@@ -612,8 +612,8 @@ Function UpgradeContent() {
 		$remain = $track |? {$_.status -ne "Completed" -and $_.status -ne "Failed"}
 	} while ($remain)
 	Write-Host "===== Upgrade Content Databases DONE ====="
-	$track | group status | ft -a
-	$track | ft -a
+	$track | group status | Format-Table -AutoSize
+	$track | Format-Table -AutoSize
 	
 	# Clean up
 	Get-PSSession | Remove-PSSession
@@ -645,7 +645,7 @@ Function ShowForm($prod) {
 
 	# Drop Down
 	$selMonth = New-Object System.Windows.Forms.ComboBox
-	$choices = $csv |? {$_.Product -eq $prod} | Sort Year,Month -Desc | Select Year,Month -Unique
+	$choices = $csv |? {$_.Product -eq $prod} | sort Year,Month -Desc | select Year,Month -Unique
 	foreach ($c in $choices) {
 		$row = $c.Year + " " + (getMonth($c.Month))
 		if (!$text) {$text = $row}
@@ -673,7 +673,7 @@ Function ShowForm($prod) {
 	$btnOK.Add_Click({ClickBtnOK})
 
 	# Display form
-	$res = $form.ShowDialog()
+	$form.ShowDialog()
 }
 
 Function GetMonth($mo) {
@@ -696,7 +696,7 @@ Function GetMonthInt($name) {
 
 Function PatchMenu() {
 	# ensure folder
-	md "$root\media" -ErrorAction SilentlyContinue | Out-Null
+	mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
 	
 	# Download CSV of patches
 	$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
@@ -776,7 +776,7 @@ Function PatchMenu() {
 
 Function DownloadMedia() {
 	# Already have media?  Then skip
-	md "$root\media" -ErrorAction SilentlyContinue | Out-Null
+	mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
 	$files = Get-ChildItem "$root\media\*.exe"
 	if (!$files)	 {
 		# Download media
@@ -834,7 +834,7 @@ Function Main() {
 	Write-Host "==="
 
 	# Local farm servers
-	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | Sort Address
+	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
 
 	# Core steps
 	if (!$phaseTwo) {
