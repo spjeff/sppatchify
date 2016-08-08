@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.27
+	Version			: 0.28
 	Last Modified	: 08-08-2016
 .LINK
 	Source Code
@@ -44,9 +44,10 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.24"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.28"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+$stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ConfigWiz","Done")
 
 #region binary EXE
 Function CopyEXE($action) {
@@ -67,6 +68,11 @@ Function CopyEXE($action) {
 		$prct = [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity "Copy EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
+		
+		# GUI
+		$coll = newStatus("CopyEXE")
+		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
+		displayStatus $coll
 		
 		# Skip current machine
 		if ($addr -ne $env:computername) {
@@ -89,8 +95,8 @@ Function CopyEXE($action) {
 	Write-Progress -Activity "Completed" -Completed
 }
 
-Function StartEXE() {
-	Write-Host "===== StartEXE ===== $(Get-Date)" -Fore Yellow
+Function RunEXE() {
+	Write-Host "===== RunEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Build CMD
 	$ver = (Get-SPFarm).BuildVersion.Major
@@ -194,7 +200,6 @@ Function LocalReboot() {
 }
 #endregion
 
-
 #region SP Config Wizard
 Function LoopRemoteCmd($msg, $cmd) {
 	#Clean up
@@ -221,6 +226,31 @@ Function LoopRemoteCmd($msg, $cmd) {
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
 		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
 		$counter++
+		
+		# GUI
+		switch -wildcard ($msg) {
+			"STOP services on*" {
+				$stage = "StopSvc"
+				break;
+			}
+			"START services on*" {
+				$stage = "StartSvc"
+				break;
+			}
+			"Run EXE on*" {
+				$stage = "RunEXE"
+				break;
+			}
+			"Run Config Wizard on*" {
+				$stage = "ConfigWiz"
+				break;
+			}
+		}
+		if ($stage) {
+			$coll = newStatus($stage)
+			($coll |? {$_.Server -eq $server.Address})."$stage" = 1
+			displayStatus $coll
+		}
 		
 		# Remote Posh
 		$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
@@ -524,6 +554,10 @@ Function UpgradeContent() {
 		$i++
 	}
 	$track | Format-Table -Auto
+	
+	# GUI - servers done
+	$coll = newStatus("Done")
+	displayStatus $coll
 
 	# Clean up
 	Get-PSSession | Remove-PSSession
@@ -600,6 +634,10 @@ Function UpgradeContent() {
 				$prct = [Math]::Round(($counter/$track.Count)*100)
 				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
 				$track | Format-Table -AutoSize
+				
+				# GUI
+				$msg = "Upgrading Content DB: $name ($prct %) - $counter of $($track.Count)"
+				displayStatus $coll ($prct*3) $msg
 				Start-Sleep 3
 			}
 		}
@@ -799,7 +837,84 @@ Function DetectAdmin() {
 }
 #endregion
 
-Function Main() {
+#region GUI status window
+function newStatus($currentStage) { 
+    # servers (rows)
+    $coll = @()
+    $servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
+    foreach ($server in $servers) {
+        $row = New-Object -TypeName PSObject -Property @{Server=$server.Name; Role=$server.Role}
+        $coll += $row
+    }
+
+    # stages (cols)
+    foreach ($row in $coll) {
+        $i = $stages.IndexOf($currentStage)
+        foreach ($s in $stages) {
+            if ($stages.IndexOf($s) -lt $i) {$v = 2} else {$v = 0}
+            $row | Add-Member -MemberType NoteProperty -Name $s -Value $v
+        }
+    }
+    return $coll
+}
+
+function displayStatus($coll, $px, $msg) {
+    # percent
+    $c=0
+    foreach ($row in $coll) {
+        foreach ($col in $stages) {
+            if ($row."$col" -ne 0) {
+                $c++
+            }
+        }
+    }
+	$total = $coll.count * $stages.count
+	$prct = [Math]::Round(($c / $total) * 100)
+
+    # generate HTML
+    $root = "C:\Users\SRVSPFARMD.FANNIEMAED\desktop"
+    $file = "$root\sppatchify-status.html"
+    $meta = '<meta http-equiv="refresh" content="5">'
+
+# progress bar
+if ($px) {
+$foot = @"
+<br/>
+<b>Content DB: {0}</b>
+<div style='width:300px;border:1px solid black'>
+<div style='width:{1}px;height:20px;background-color:blue;'></div>
+</div>
+<div style='text-align:right'>{2}</div>
+"@ -f $msg,$px,(Get-Date)
+}
+
+    # colors
+    $html = $coll | ConvertTo-Html -Head $meta -Title "SPPatchify ($prct %)" -PostContent $foot
+    $html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
+    $html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
+    $html = $html.replace("<td>1</td>","<td style='background-color:yellow'>In Progress</td>")
+    $html = $html.replace("<td>2</td>","<td style='background-color:lightgreen'>Complete</td>")
+    $html | Out-File $file -Force -Confirm:$false
+
+    launchIE $file
+}
+
+function launchIE($file) {
+    # web browser
+    $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
+    if (!$ieproc) {
+        $global:ie = new-object -comobject InternetExplorer.Application
+        $global:ie.visible = $true
+        $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
+        $global:ie.navigate($file)
+        $global:HWND =  $global:ie.HWND
+    } else {
+        $global:ie.navigate($file)
+    }
+}
+#endregion
+
+function Main() {
 	# download media
 	if ($downloadMediaOnly) {
 		PatchMenu
@@ -844,7 +959,7 @@ Function Main() {
 			ChangeDC
 			ChangeServices $false
 			IISStart
-			StartEXE
+			RunEXE
 			WaitReboot
 			LocalReboot
 		}
@@ -888,5 +1003,4 @@ Function Main() {
 	
 	Stop-Transcript
 }
-
 Main
