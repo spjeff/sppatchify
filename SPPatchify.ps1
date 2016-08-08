@@ -25,11 +25,11 @@
 param (
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
 	[Alias("d")]
-	[switch]$downloadOnly,
+	[switch]$downloadMediaOnly,
 
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
 	[Alias("c")]
-	[switch]$copyOnly,
+	[switch]$copyMediaOnly,
 
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
 	[Alias("v")]
@@ -769,7 +769,7 @@ Function PatchMenu() {
 	}
 }
 
-Function DownloadMedia() {
+Function downloadMediaOnly() {
 	# Already have media?  Then skip
 	mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
 	$files = Get-ChildItem "$root\media\*.exe"
@@ -801,7 +801,7 @@ Function DetectAdmin() {
 
 Function Main() {
 	# download media
-	if ($downloadOnly) {
+	if ($downloadMediaOnly) {
 		PatchMenu
 		exit
 	}
@@ -821,8 +821,8 @@ Function Main() {
 		
 	# Params
 	Write-Host "=== PARAMS ==="
-	Write-Host "download = $downloadOnly"
-	Write-Host "copy = $copyOnly"
+	Write-Host "download = $downloadMediaOnly"
+	Write-Host "copy = $copyMediaOnly"
 	Write-Host "version = $showVersion"
 	Write-Host "phaseTwo = $phaseTwo"
 	Write-Host "==="
@@ -832,12 +832,12 @@ Function Main() {
 
 	# Core steps
 	if (!$phaseTwo) {
-		if ($copyOnly) {
-			# CMD switch -C (copy only)
+		if ($copyMediaOnly) {
+			# CMD switch -C (copy media only)
 			CopyEXE "Copy"
 		} else {
 			# Phase One - patch EXE
-			DownloadMedia
+			downloadMediaOnly
 			EnablePSRemoting
 			ReadIISPW
 			CopyEXE "Copy"
