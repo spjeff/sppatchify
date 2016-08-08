@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.26
-	Last Modified	: 08-07-2016
+	Version			: 0.27
+	Last Modified	: 08-08-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,25 +23,21 @@
 
 [CmdletBinding()]
 param (
-	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
-	[Alias("c")]
-	[switch]$copyOnly,
-	
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
 	[Alias("d")]
 	[switch]$downloadOnly,
-	
+
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
+	[Alias("c")]
+	[switch]$copyOnly,
+
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
-	[Alias("prod")]
-	[string]$downloadProduct,
+	[Alias("v")]
+	[switch]$showVersion,	
 	
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
 	[Alias("p")]
-	[switch]$phaseTwo,
-	
-	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
-	[Alias("v")]
-	[switch]$showVersion
+	[switch]$phaseTwo
 )
 
 # Plugin
@@ -720,7 +716,6 @@ Function PatchMenu() {
 		}
 	}
 	$prod = "$sku$ver"
-	if ($downloadProduct) {$prod = $downloadProduct}
 	Write-Host "Product = $prod"
 	ShowForm $prod
 	
@@ -826,11 +821,10 @@ Function Main() {
 		
 	# Params
 	Write-Host "=== PARAMS ==="
-	Write-Host "copyOnly = $copyOnly"
+	Write-Host "download = $downloadOnly"
+	Write-Host "copy = $copyOnly"
+	Write-Host "version = $showVersion"
 	Write-Host "phaseTwo = $phaseTwo"
-	Write-Host "downloadOnly = $downloadOnly"
-	Write-Host "downloadProduct = $downloadProduct"
-	Write-Host "showVersion = $showVersion"
 	Write-Host "==="
 
 	# Local farm servers
