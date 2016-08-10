@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.28
-	Last Modified	: 08-08-2016
+	Version			: 0.29
+	Last Modified	: 08-10-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,10 +44,10 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.28"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.29"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ConfigWiz","Done")
+$stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
 
 #region binary EXE
 Function CopyEXE($action) {
@@ -61,6 +61,7 @@ Function CopyEXE($action) {
 	$remoteRoot = -join $char
 
 	# Loop servers
+	$coll = newStatus("CopyEXE")
 	$counter = 0
 	foreach ($server in $global:servers) {
 		# Progress
@@ -69,8 +70,7 @@ Function CopyEXE($action) {
 		Write-Progress -Activity "Copy EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
-		# GUI
-		$coll = newStatus("CopyEXE")
+		# GUI In Progress
 		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
 		displayStatus $coll
 		
@@ -91,6 +91,10 @@ Function CopyEXE($action) {
 				Remove-Item "\\$addr\$remoteRoot\media\*.*" -confirm:$false
 			}
 		}
+		
+		# GUI Done
+		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 2
+		displayStatus $coll
 	}
 	Write-Progress -Activity "Completed" -Completed
 }
@@ -205,6 +209,33 @@ Function LoopRemoteCmd($msg, $cmd) {
 	#Clean up
 	Get-PSSession | Remove-PSSession
 	
+	#GUI
+	switch -wildcard ($msg) {
+		"STOP services on*" {
+			$stage = "StopSvc"
+			break;
+		}
+		"START services on*" {
+			$stage = "StartSvc"
+			break;
+		}
+		"Run EXE on*" {
+			$stage = "RunEXE"
+			break;
+		}
+		"Product local*" {
+			$stage = "ProdLocal"
+			break;
+		}
+		"Run Config Wizard on*" {
+			$stage = "ConfigWiz"
+			break;
+		}
+	}
+	if ($stage) {
+		$coll = newStatus($stage)
+	}
+	
 	# Loop servers
 	$counter = 0
 	foreach ($server in $global:servers) {
@@ -227,27 +258,8 @@ Function LoopRemoteCmd($msg, $cmd) {
 		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
 		$counter++
 		
-		# GUI
-		switch -wildcard ($msg) {
-			"STOP services on*" {
-				$stage = "StopSvc"
-				break;
-			}
-			"START services on*" {
-				$stage = "StartSvc"
-				break;
-			}
-			"Run EXE on*" {
-				$stage = "RunEXE"
-				break;
-			}
-			"Run Config Wizard on*" {
-				$stage = "ConfigWiz"
-				break;
-			}
-		}
+		# GUI - In Progress
 		if ($stage) {
-			$coll = newStatus($stage)
 			($coll |? {$_.Server -eq $server.Address})."$stage" = 1
 			displayStatus $coll
 		}
@@ -264,6 +276,12 @@ Function LoopRemoteCmd($msg, $cmd) {
 			Invoke-Command -Session $remote -ScriptBlock $s
 		}
 		Write-Host "<< complete on $addr" -Fore Green
+		
+		# GUI - Done
+		if ($stage) {
+			($coll |? {$_.Server -eq $server.Address})."$stage" = 2
+			displayStatus $coll
+		}
 	}
 	Write-Progress -Activity "Completed" -Completed	
 	
@@ -556,7 +574,7 @@ Function UpgradeContent() {
 	$track | Format-Table -Auto
 	
 	# GUI - servers done
-	$coll = newStatus("Done")
+	$coll = newStatus("done")
 	displayStatus $coll
 
 	# Clean up
@@ -648,6 +666,10 @@ Function UpgradeContent() {
 	Write-Host "===== Upgrade Content Databases DONE ====="
 	$track | group status | Format-Table -AutoSize
 	$track | Format-Table -AutoSize
+	
+	# GUI
+	$msg = "Upgrade Content DB Complete (100 %)"
+	displayStatus $coll (100*3) $msg
 	
 	# Clean up
 	Get-PSSession | Remove-PSSession
@@ -850,9 +872,10 @@ function newStatus($currentStage) {
     # stages (cols)
     foreach ($row in $coll) {
         $i = $stages.IndexOf($currentStage)
+		if ($currentStage -eq "done") {$i = $stages.count}
         foreach ($s in $stages) {
-            if ($stages.IndexOf($s) -lt $i) {$v = 2} else {$v = 0}
-            $row | Add-Member -MemberType NoteProperty -Name $s -Value $v
+			if ($stages.IndexOf($s) -lt $i) {$v = 2} else {$v = 0}
+			$row | Add-Member -MemberType NoteProperty -Name $s -Value $v
         }
     }
     return $coll
@@ -860,36 +883,36 @@ function newStatus($currentStage) {
 
 function displayStatus($coll, $px, $msg) {
     # percent
-    $c=0
+    $c = 0
     foreach ($row in $coll) {
         foreach ($col in $stages) {
-            if ($row."$col" -ne 0) {
+            if ($row."$col" -eq 2) {
                 $c++
             }
         }
     }
 	$total = $coll.count * $stages.count
 	$prct = [Math]::Round(($c / $total) * 100)
-
-    # generate HTML
-    $root = "C:\Users\SRVSPFARMD.FANNIEMAED\desktop"
-    $file = "$root\sppatchify-status.html"
-    $meta = '<meta http-equiv="refresh" content="5">'
-
-# progress bar
+	
+	# progress bar
+$foot = "<div style='text-align:right'>{0}</div>" -f (Get-Date)
 if ($px) {
-$foot = @"
+$foot += @"
 <br/>
-<b>Content DB: {0}</b>
+<b>{0}</b>
 <div style='width:300px;border:1px solid black'>
 <div style='width:{1}px;height:20px;background-color:blue;'></div>
 </div>
-<div style='text-align:right'>{2}</div>
-"@ -f $msg,$px,(Get-Date)
+"@ -f $msg,$px
+$prct = $px/3
 }
 
+    # generate HTML
+    $file = "$root\sppatchify-status.html"
+    $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
+
     # colors
-    $html = $coll | ConvertTo-Html -Head $meta -Title "SPPatchify ($prct %)" -PostContent $foot
+    $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
     $html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
     $html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>","<td style='background-color:yellow'>In Progress</td>")
@@ -906,11 +929,9 @@ function launchIE($file) {
         $global:ie = new-object -comobject InternetExplorer.Application
         $global:ie.visible = $true
         $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
-        $global:ie.navigate($file)
         $global:HWND =  $global:ie.HWND
-    } else {
-        $global:ie.navigate($file)
     }
+	$global:ie.navigate($file)
 }
 #endregion
 
