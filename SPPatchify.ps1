@@ -1022,6 +1022,8 @@ function Main() {
 		Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
 	}
 	
+	# Cleanup
+	Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
 	Stop-Transcript
 }
 Main
