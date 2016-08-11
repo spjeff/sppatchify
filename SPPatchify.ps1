@@ -11,7 +11,7 @@
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
 	Version			: 0.29
-	Last Modified	: 08-10-2016
+	Last Modified	: 08-11-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -747,7 +747,6 @@ Function GetMonthInt($name) {
 			return $_
 		}
 	}
-	return $name
 }
 
 Function PatchMenu() {
