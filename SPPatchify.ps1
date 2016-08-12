@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.29
-	Last Modified	: 08-11-2016
+	Version			: 0.30
+	Last Modified	: 08-12-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.29"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.30"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -1002,6 +1002,8 @@ function Main() {
 	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Hours: $th" -Fore Yellow
+	$online = (Get-SPContentDatabase).Count
+	Write-Host "Content Databases Online: $online"
 	
 	# Add both Phase one and two
 	$regHive = "HKCU:\Software"
