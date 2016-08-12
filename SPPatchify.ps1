@@ -84,7 +84,7 @@ Function CopyEXE($action) {
 					$dest = "\\$addr\$remoteRoot\media"
 					mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null
 					mkdir $dest.replace("media","log") -Force -ErrorAction SilentlyContinue | Out-Null
-					ROBOCOPY "media" $dest /Z /W:0 /R:0 /XX /XN /XO
+					ROBOCOPY "media" $dest /J /Z /W:0 /R:0 /XX
 				}
 			} else {
 				# Delete
@@ -975,6 +975,8 @@ function Main() {
 	Write-Host "version = $showVersion"
 	Write-Host "phaseTwo = $phaseTwo"
 	Write-Host "==="
+	$online = (Get-SPContentDatabase).Count
+	Write-Host "Content Databases Online: $online"
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
