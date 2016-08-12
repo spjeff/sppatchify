@@ -110,7 +110,7 @@ Function RunEXE() {
 		$patchName = $name.replace(".exe","")
 		$cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
 		if ($ver -eq 16) {
-			$cmd = $cmd.replace("/forcerestart","/norestart")
+			$cmd = $cmd.replace("forcerestart","norestart")
 		}
 		LoopRemoteCmd "Run EXE on " $cmd
 		WaitEXE $patchName
@@ -130,8 +130,8 @@ Function WaitEXE($patchName) {
 	Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
-	Write-Host "Wait 30 sec..."
-	Start-Sleep 30
+	Write-Host "Wait 60 sec..."
+	Start-Sleep 60
 
 	# Verify machines online
 	$counter = 0
@@ -139,17 +139,24 @@ Function WaitEXE($patchName) {
 		# Progress
 		$addr = $server.Address
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Waiting for EXE ($prct %)" -Status $addr -PercentComplete $prct
+		Write-Progress -Activity "Wait  EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
 		$when = Get-Date
-		Write-Host "`nEXE started on $addr at $when " -NoNewLine
+		Write-Host "`nEXE monitor started on $addr at $when " -NoNewLine
 		do {
 			# Monitor EXE process
 			$proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
 			Write-Host "."  -NoNewLine
-			Start-Sleep 3
+			Start-Sleep 5
+			
+			# Count MSPLOG files
+			Write-Host "MSPLOG" -Fore Yellow
+			$cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
+			$sb = [Scriptblock]::Create($cmd)
+			$result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
+			$result | select Server,Count,LastWriteTime | sort LastWriteTime -desc | ft -a
 		} while ($proc)
 	}
 }
@@ -158,8 +165,8 @@ Function WaitReboot() {
 	Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore Yellow
 	
 	# Wait for reboot
-	Write-Host "Wait 30 sec..."
-	Start-Sleep 30
+	Write-Host "Wait 60 sec..."
+	Start-Sleep 60
 	
 	#Clean up
 	Get-PSSession | Remove-PSSession
@@ -174,14 +181,14 @@ Function WaitReboot() {
 		$counter++
 		
 		# Remote Posh
-		while (!$remote) {
+		do {
 			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
 			if (!$remote) {
 				$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
 			}
 			Write-Host "."  -NoNewLine
-			Start-Sleep 3
-		}
+			Start-Sleep 5
+		} while (!$remote)
 	}
 	
 	#Clean up
@@ -194,7 +201,7 @@ Function LocalReboot() {
 	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
 	
 	# Reboot
-	Write-Host "`n ===== REBOOT LOCAL ===== "
+	Write-Host "`n ===== REBOOT LOCAL ===== $(Get-Date)"
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
 	Write-Host "Duration Total Hours: $th" -Fore Yellow
 	Stop-Transcript
@@ -244,6 +251,9 @@ Function LoopRemoteCmd($msg, $cmd) {
 		if ($cmd.GetType().Name -eq "String") {
 			if ($env:computername -eq $server.Address) {
 				$runCmd = $cmd -replace "forcerestart","norestart"
+				if ($cmd -like '*uber*') {
+					$cmd = ""
+				}
 			} else {
 				$runCmd = $cmd
 			}
@@ -269,7 +279,9 @@ Function LoopRemoteCmd($msg, $cmd) {
 		if (!$remote) {
 			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
 		}
-        Start-Sleep 3
+		Start-Sleep 3
+        
+		# Invoke
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
 			Write-Host $s.ToString()
@@ -663,7 +675,7 @@ Function UpgradeContent() {
 		# Latest counter
 		$remain = $track |? {$_.status -ne "Completed" -and $_.status -ne "Failed"}
 	} while ($remain)
-	Write-Host "===== Upgrade Content Databases DONE ====="
+	Write-Host "===== Upgrade Content Databases DONE ===== $(Get-Date)"
 	$track | group status | Format-Table -AutoSize
 	$track | Format-Table -AutoSize
 	
