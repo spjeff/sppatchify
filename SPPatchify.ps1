@@ -930,7 +930,9 @@ function launchIE($file) {
         $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
         $global:HWND =  $global:ie.HWND
     }
-	$global:ie.navigate($file)
+	try {
+		$global:ie.navigate($file)
+	} catch {}
 }
 #endregion
 
