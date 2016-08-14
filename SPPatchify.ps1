@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.30
-	Last Modified	: 08-12-2016
+	Version			: 0.31
+	Last Modified	: 08-13-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.30"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.31"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -139,7 +139,7 @@ Function WaitEXE($patchName) {
 		# Progress
 		$addr = $server.Address
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Wait  EXE ($prct %)" -Status $addr -PercentComplete $prct
+		Write-Progress -Activity "Wait EXE ($prct %)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
@@ -148,11 +148,10 @@ Function WaitEXE($patchName) {
 		do {
 			# Monitor EXE process
 			$proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
-			Write-Host "."  -NoNewLine
 			Start-Sleep 5
 			
 			# Count MSPLOG files
-			Write-Host "MSPLOG" -Fore Yellow
+			Write-Host "MSPLOG - $addr" -Fore Yellow
 			$cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
 			$sb = [Scriptblock]::Create($cmd)
 			$result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
@@ -296,9 +295,6 @@ Function LoopRemoteCmd($msg, $cmd) {
 		}
 	}
 	Write-Progress -Activity "Completed" -Completed	
-	
-	#Clean up
-	Get-PSSession | Remove-PSSession
 }
 
 Function ChangeDC() {
