@@ -148,15 +148,19 @@ Function WaitEXE($patchName) {
 		do {
 			# Monitor EXE process
 			$proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
-			$proc | ft -a
-			Start-Sleep 20
+			Write-Host "." -NoNewLine
+			Start-Sleep 5
 			
 			# Count MSPLOG files
-			Write-Host "MSPLOG - $addr" -Fore Yellow
 			$cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
 			$sb = [Scriptblock]::Create($cmd)
-			$result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-			$result | select Server,Count,LastWriteTime | sort LastWriteTime -desc | ft -a
+			$msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
+			$msp = $msp | select Server,Count,LastWriteTime | sort LastWriteTime -desc
+			
+			# HTML view
+			$coll = newStatus("RunEXE")
+			($coll |? {$_.Server -eq $addr}).RunEXE = 2
+			displayStatus $coll $false $false $msp
 		} while ($proc)
 	}
 }
@@ -886,7 +890,7 @@ function newStatus($currentStage) {
     return $coll
 }
 
-function displayStatus($coll, $px, $msg) {
+function displayStatus($coll, $px, $msg, $msp) {
     # percent
     $c = 0
     foreach ($row in $coll) {
@@ -915,6 +919,11 @@ $prct = $px/3
     # generate HTML
     $file = "$root\sppatchify-status.html"
     $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
+	
+	# MSPLOG second table
+	if ($msp) {
+		$foot = ($msp | ConvertTo-Html -Fragment) + $foot
+	}
 
     # colors
     $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
