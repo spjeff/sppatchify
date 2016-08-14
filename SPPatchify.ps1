@@ -148,7 +148,8 @@ Function WaitEXE($patchName) {
 		do {
 			# Monitor EXE process
 			$proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
-			Start-Sleep 5
+			$proc | ft -a
+			Start-Sleep 20
 			
 			# Count MSPLOG files
 			Write-Host "MSPLOG - $addr" -Fore Yellow
@@ -250,9 +251,6 @@ Function LoopRemoteCmd($msg, $cmd) {
 		if ($cmd.GetType().Name -eq "String") {
 			if ($env:computername -eq $server.Address) {
 				$runCmd = $cmd -replace "forcerestart","norestart"
-				if ($cmd -like '*uber*') {
-					$cmd = ""
-				}
 			} else {
 				$runCmd = $cmd
 			}
