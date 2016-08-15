@@ -750,9 +750,9 @@ Function PatchMenu() {
 	# Skip if we already have media
 	$files = Get-ChildItem "$root\media\*.exe"
 	if ($files) {
-		Write-Host "Using EXE files found in \media\.  `nTo trigger download GUI first delete these files and run script again."		
+		Write-Host "Using EXE found in \media\.`nTo trigger download GUI first delete \media\ folder and run script again."		
 		$files | Format-Table -Auto
-		Break
+		Return
 	}
 
 	# Download CSV of patch URLs
