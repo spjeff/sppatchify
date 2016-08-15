@@ -51,7 +51,7 @@ $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
 
 #region binary EXE
 Function CopyEXE($action) {
-	Write-Host "===== $action EXE ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Remote UNC
 	$char = $root.ToCharArray()
@@ -100,7 +100,7 @@ Function CopyEXE($action) {
 }
 
 Function RunEXE() {
-	Write-Host "===== RunEXE ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Build CMD
 	$ver = (Get-SPFarm).BuildVersion.Major
@@ -127,7 +127,7 @@ Function RunEXE() {
 }
 
 Function WaitEXE($patchName) {
-	Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Wait for reboot
 	Write-Host "Wait 60 sec..."
@@ -166,7 +166,7 @@ Function WaitEXE($patchName) {
 }
 
 Function WaitReboot() {
-	Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore Yellow
+	Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Wait for reboot
 	Write-Host "Wait 60 sec..."
@@ -210,7 +210,7 @@ Function LocalReboot() {
 	# Reboot
 	Write-Host "`n ===== REBOOT LOCAL ===== $(Get-Date)"
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
-	Write-Host "Duration Total Hours: $th" -Fore Yellow
+	Write-Host "Duration Total Hours: $th" -Fore "Yellow"
 	Stop-Transcript
 	Start-Sleep 5
 	Restart-Computer -Force
@@ -286,12 +286,12 @@ Function LoopRemoteCmd($msg, $cmd) {
 		Start-Sleep 3
 		
 		# Invoke
-		Write-Host ">> invoke on $addr" -Fore Green
+		Write-Host ">> invoke on $addr" -Fore "Green"
 		foreach ($s in $sb) {
 			Write-Host $s.ToString()
 			Invoke-Command -Session $remote -ScriptBlock $s
 		}
-		Write-Host "<< complete on $addr" -Fore Green
+		Write-Host "<< complete on $addr" -Fore "Green"
 		
 		# GUI - Done
 		if ($stage) {
@@ -303,7 +303,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 }
 
 Function ChangeDC() {
-	Write-Host "===== ChangeDC OFF ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== ChangeDC OFF ===== $(Get-Date)" -Fore "Yellow"
 
 	# Distributed Cache
 	$sb = {
@@ -338,7 +338,7 @@ Function ChangeDC() {
 }
 
 Function ChangeServices($state) {
-	Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Logic core
 	if ($state) {
@@ -410,7 +410,7 @@ Function RunConfigWizard() {
 }
 
 Function ChangeContent($state) {
-	Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore "Yellow"
 
 	if (!$state) {
 		# Remove content
@@ -453,7 +453,7 @@ Function EnablePSRemoting() {
 }
 
 Function ReadIISPW {
-	Write-Host "===== Read IIS PW ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== Read IIS PW ===== $(Get-Date)" -Fore "Yellow"
 
 	# Current user (ex: Farm Account)
 	$domain = $env:userdomain
@@ -566,12 +566,12 @@ Function ProductLocal() {
 	LoopRemoteCmd "Product local SKU on " $sb
 	
 	# Display server upgrade
-	Write-Host "Farm Servers - Upgrade Status " -Fore Yellow
+	Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
 	(Get-SPProduct).Servers | Select Servername,InstallStatus | Sort Servername | ft -a
 }
 
 Function UpgradeContent() {
-	Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore "Yellow"
 	
 	# Tracking table - assign DB to server
 	$maxWorkers = 4
@@ -654,7 +654,7 @@ Function UpgradeContent() {
 					# Run on remote server
 					$remoteCmd = [Scriptblock]::Create($remoteStr) 
 					$pc = $server.Address
-					Write-Host $pc -Fore green
+					Write-Host $pc -Fore "Green"
 					Get-PSSession | Format-Table -AutoSize
 					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
 					$result = Invoke-Command $remoteCmd -Session $session -AsJob
@@ -693,61 +693,38 @@ Function UpgradeContent() {
 	Get-Job | Remove-Job
 }
 
-Function ShowForm($prod) {
-	# Load DLL
-	$global:selmonth = ""
-	[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
-	$local = "$root\SPPatchify-Download-CU.csv"
-	$csv = Import-Csv $local
-
-	# WinForm
-	$form = New-Object System.Windows.Forms.Form
-	$form.Text = "Select Month - $prod"
-	$form.Size = New-Object System.Drawing.Size(260,180)
-	$form.MaximizeBox = $false
-	$form.MinimizeBox = $false
-	$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
-
-	# Label
-	$lbl = New-Object System.Windows.Forms.Label
-	$lbl.Text = "SharePoint month to download. `nPatch files be saved to \media\ folder."
-	$lbl.Top = 10
-	$lbl.Left = 10
-	$lbl.Width = 220
-	$form.Controls.Add($lbl)
-
-	# Drop Down
-	$selMonth = New-Object System.Windows.Forms.ComboBox
+Function ShowMenu($prod) {
+	# Choices
+	$csv = Import-Csv "$root\SPPatchify-Download-CU.csv"
 	$choices = $csv |? {$_.Product -eq $prod} | sort Year,Month -Desc | select Year,Month -Unique
-	foreach ($c in $choices) {
-		$row = $c.Year + " " + (getMonth($c.Month))
-		if (!$text) {$text = $row}
-		$selMonth.Items.add($row) | Out-Null
+
+	# Menu
+	Write-Host "Download CU Media to \media\ - $prod" -Fore "Yellow"
+	Write-Host "---------"
+	$menu = @()
+	$i = 0
+	$choices |% {
+		$n = (getMonth($_.Month)) + " " + ($_.Year)
+		$menu += $n
+		if ($i -eq 0) {
+			$default = $n
+			$n += "[default] <=="
+			Write-Host "$i $n" -Fore "Green"
+		} else {
+			Write-Host "$i $n"
+		}
+		$i++
 	}
-	$selMonth.Top = 60
-	$selMonth.Left = 10
-	$selMonth.DropDownStyle  = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-	$selMonth.Text = $text
-	$form.Controls.Add($selMonth)
 
-	# Button
-	$btnOK = New-Object System.Windows.Forms.Button
-	$btnOK.Text = "OK"
-	$btnOK.Top = 60
-	$btnOK.Left = 160
-	$btnOK.Width = 80
-	$form.Controls.Add($btnOK)
-
-	# Event Handlers
-	Function ClickBtnOK() {
-		$global:selmonth = $selMonth.Text 
-		$form.Close()
+	# Return
+	$sel = Read-Host "Select month. Press [enter] for default"
+	if (!$sel) {
+		$sel = $default
+	} else {
+		$sel = $menu[$sel]
 	}
-	$btnOK.Add_Click({ClickBtnOK})
-
-	# Display form
-	$form.ShowDialog()
-}
+	$global:selmonth = $sel
+} 
 
 Function GetMonth($mo) {
 	try {
@@ -767,10 +744,18 @@ Function GetMonthInt($name) {
 }
 
 Function PatchMenu() {
-	# ensure folder
+	# Ensure folder
 	mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
-	
-	# Download CSV of patches
+
+	# Skip if we already have media
+	$files = Get-ChildItem "$root\media\*.exe"
+	if ($files) {
+		Write-Host "Using EXE files found in \media\.  `nTo trigger download GUI first delete these files and run script again."		
+		$files | Format-Table -Auto
+		Break
+	}
+
+	# Download CSV of patch URLs
 	$source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
 	$local = "$root\SPPatchify-Download-CU.csv"
 	$wc = New-Object System.Net.Webclient
@@ -778,14 +763,18 @@ Function PatchMenu() {
 	$wc.DownloadFile($source, $dest)
 	
 	# Overwrite if downloaded OK
-	Copy-Item $dest $local -Force
-	Remove-Item $dest
+	if (Test-Path $dest) {
+		Copy-Item $dest $local -Force
+		Remove-Item $dest
+	}
 	$csv = Import-Csv $local
 	
 	# SKU - SharePoint or Project?
 	$sku = "SP"
 	$ver = "15"
-	$ver = (Get-SPFarm).BuildVersion.Major
+	if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
+		$ver = (Get-SPFarm).BuildVersion.Major
+	}
 	if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
 		if ($ver -ne 16) {
 			$sku = "PROJ"
@@ -793,8 +782,8 @@ Function PatchMenu() {
 	}
 	$prod = "$sku$ver"
 	Write-Host "Product = $prod"
-	ShowForm $prod
-	
+	ShowMenu $prod
+
 	# Halt if Farm is PROJ and media is not
 	$files = Get-ChildItem "$root\media\*prj*.exe"
 	if ($sku -eq "PROJ" -and !$files) {
@@ -803,7 +792,7 @@ Function PatchMenu() {
 		Exit
 	}
 	
-	# Halt if have multiple EXE
+	# Halt if have multiple EXE and not SP2016
 	$files = Get-ChildItem "$root\media\*.exe"
 	if ($files -is [System.Array] -and $ver -ne 16) {
 		# HALT - multiple EXE found - require clean up before continuing
@@ -813,14 +802,14 @@ Function PatchMenu() {
 		Exit
 	}
 	
-	# Filter CSV for file names
-	Write-Host "SELECTED = $($global:selmonth)" -Fore Yellow
-	$year = $global:selmonth.Split(" ")[0]
-	$month = GetMonthInt $global:selmonth.Split(" ")[1]
+	# Filter CSV for selected CU month
+	Write-Host "SELECTED = $($global:selmonth)" -Fore "Yellow"
+	$year = $global:selmonth.Split(" ")[1]
+	$month = GetMonthInt $global:selmonth.Split(" ")[0]
 	$patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
 	$patchFiles | Format-Table -Auto
 	
-	# Download patch media
+	# Download patch files
 	$bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
 	foreach ($file in $patchFiles) {
 		# Parameters
@@ -842,19 +831,6 @@ Function PatchMenu() {
 				(New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
 			}
 		}
-	}
-}
-
-Function downloadMediaOnly() {
-	# Already have media?  Then skip
-	mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
-	$files = Get-ChildItem "$root\media\*.exe"
-	if (!$files)	 {
-		# Download media
-		PatchMenu
-	} else {
-		Write-Host "Using EXE files found in \media\.  `nTo trigger download GUI first delete these files and run script again."		
-		$files |Format-Table -Auto
 	}
 }
 
@@ -962,13 +938,13 @@ function Main() {
 	# download media
 	if ($downloadMediaOnly) {
 		PatchMenu
-		exit
+		Exit
 	}
 	
 	# display version
 	if ($showVersion) {
 		DisplayVersion
-		exit
+		Exit
 	}
 	
 	# Start time
@@ -979,14 +955,13 @@ function Main() {
 	Start-Transcript $logFile
 		
 	# Params
-	Write-Host "=== PARAMS ==="
-	Write-Host "download = $downloadMediaOnly"
-	Write-Host "copy = $copyMediaOnly"
-	Write-Host "version = $showVersion"
-	Write-Host "phaseTwo = $phaseTwo"
-	Write-Host "==="
-	$online = (Get-SPContentDatabase).Count
-	Write-Host "Content Databases Online: $online"
+	$msg = "=== PARAMS ==="
+	$msg +=	"download = $downloadMediaOnly"
+	$msg +=	"copy = $copyMediaOnly"
+	$msg +=	"version = $showVersion"
+	$msg +=	"phaseTwo = $phaseTwo"
+	$c = (Get-SPContentDatabase).Count
+	Write-Host "Content Databases Online: $c"
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
@@ -998,7 +973,7 @@ function Main() {
 			CopyEXE "Copy"
 		} else {
 			# Phase One - patch EXE
-			downloadMediaOnly
+			PatchMenu
 			EnablePSRemoting
 			ReadIISPW
 			CopyEXE "Copy"
@@ -1026,11 +1001,11 @@ function Main() {
 	}
 	
 	# Run duration
-	Write-Host "===== DONE ===== $(Get-Date)" -Fore Yellow
+	Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
 	$th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
-	Write-Host "Duration Hours: $th" -Fore Yellow
-	$online = (Get-SPContentDatabase).Count
-	Write-Host "Content Databases Online: $online"
+	Write-Host "Duration Hours: $th" -Fore "Yellow"
+	$c = (Get-SPContentDatabase).Count
+	Write-Host "Content Databases Online: $c"
 	
 	# Add both Phase one and two
 	$regHive = "HKCU:\Software"
@@ -1046,7 +1021,7 @@ function Main() {
 			$h = [double]($thKey."$regName")
 			$h += $th
 		}
-		Write-Host "TOTAL Hours (Phase One and Two): $h" -Fore Yellow
+		Write-Host "TOTAL Hours (Phase One and Two): $h" -Fore "Yellow"
 		Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
 	}
 	
