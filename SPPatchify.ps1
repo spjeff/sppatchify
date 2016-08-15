@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.31
-	Last Modified	: 08-13-2016
+	Version			: 0.32
+	Last Modified	: 08-15-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.31"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.32"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -155,11 +155,11 @@ Function WaitEXE($patchName) {
 			$cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
 			$sb = [Scriptblock]::Create($cmd)
 			$msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-			$msp = $msp | select Server,Count,LastWriteTime | sort LastWriteTime -desc
+			$msp = $msp | select Server,Count,LastWriteTime | sort LastWriteTime, Server -desc
 			
 			# HTML view
 			$coll = newStatus("RunEXE")
-			($coll |? {$_.Server -eq $addr}).RunEXE = 2
+			($coll |? {$_.Server -eq $addr}).RunEXE = 1
 			displayStatus $coll $false $false $msp
 		} while ($proc)
 	}
@@ -200,6 +200,9 @@ Function WaitReboot() {
 }
 
 Function LocalReboot() {
+	# product install status
+	
+
 	# create Regkey
 	New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name RunOnce -ErrorAction SilentlyContinue | Out-Null
 	New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
@@ -561,6 +564,10 @@ Function ProductLocal() {
         Get-SPProduct -Local
 	}
 	LoopRemoteCmd "Product local SKU on " $sb
+	
+	# display server upgrade
+	Write-Host "Farm Servers - Upgrade Status " -Fore Yellow
+	(Get-SPProduct).Servers | Select Servername,InstallStatus | Sort Servername | ft -a
 }
 
 Function UpgradeContent() {
@@ -647,7 +654,7 @@ Function UpgradeContent() {
 					# Run on remote server
 					$remoteCmd = [Scriptblock]::Create($remoteStr) 
 					$pc = $server.Address
-					Write-Host $pc -fore green
+					Write-Host $pc -Fore green
 					Get-PSSession | Format-Table -AutoSize
 					$session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
 					$result = Invoke-Command $remoteCmd -Session $session -AsJob
@@ -1000,6 +1007,7 @@ function Main() {
 			IISStart
 			RunEXE
 			WaitReboot
+			ProductLocal
 			LocalReboot
 		}
 	} else {
