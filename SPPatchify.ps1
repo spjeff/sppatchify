@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.35
+	Version			: 0.36
 	Last Modified	: 08-15-2016
 .LINK
 	Source Code
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.35"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.36"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -883,7 +883,9 @@ function displayStatus($coll, $px, $msg, $msp) {
 			}
 		}
 	}
-	$total = $coll.count * $stages.count
+	$rowCount = $coll.count
+	if (!$rowCount) {$rowCount = 1}
+	$total = $rowCount * $stages.count
 	$prct = [Math]::Round(($c / $total) * 100)
 	
 	# progress bar
