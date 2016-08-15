@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.34
+	Version			: 0.35
 	Last Modified	: 08-15-2016
 .LINK
 	Source Code
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.34"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.35"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -67,7 +67,7 @@ Function CopyEXE($action) {
 		# Progress
 		$addr = $server.Address
 		$prct = [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Copy EXE ($prct %)" -Status $addr -PercentComplete $prct
+		Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# GUI In Progress
@@ -96,7 +96,7 @@ Function CopyEXE($action) {
 		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 2
 		displayStatus $coll
 	}
-	Write-Progress -Activity "Completed" -Completed
+	Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
 Function RunEXE() {
@@ -139,7 +139,7 @@ Function WaitEXE($patchName) {
 		# Progress
 		$addr = $server.Address
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Wait EXE ($prct %)" -Status $addr -PercentComplete $prct
+		Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
@@ -181,7 +181,7 @@ Function WaitReboot() {
 		# Progress
 		$addr = $server.Address
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Waiting for machine ($prct %)" -Status $addr -PercentComplete $prct
+		Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
 		$counter++
 		
 		# Remote Posh
@@ -269,7 +269,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		# Progress
 		$addr = $server.Address
 		$prct =  [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity $msg -Status "$addr ($prct %)" -PercentComplete $prct
+		Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
 		$counter++
 		
 		# GUI - In Progress
@@ -299,7 +299,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 			displayStatus $coll
 		}
 	}
-	Write-Progress -Activity "Completed" -Completed	
+	Write-Progress -Activity "Completed $(Get-Date)" -Completed	
 }
 
 Function ChangeDC() {
@@ -433,7 +433,7 @@ Function ChangeContent($state) {
 			
 			# Progress
 			$prct =  [Math]::Round(($counter/$dbs.Count)*100)
-			Write-Progress -Activity "Add database" -Status "$name ($prct %)" -PercentComplete $prct
+			Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
 			$counter++
 		
 			Mount-SPContentDatabase -WebApplication $_.WebApp -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
@@ -667,7 +667,7 @@ Function UpgradeContent() {
 				# Progress
 				$counter = ($track |? {$_.Status -eq "Completed"}).Count
 				$prct = [Math]::Round(($counter/$track.Count)*100)
-				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %)" -PercentComplete $prct
+				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
 				$track | Format-Table -AutoSize
 				
 				# GUI
@@ -955,7 +955,7 @@ function Main() {
 	Start-Transcript $logFile
 		
 	# Params
-	$msg = "=== PARAMS ==="
+	$msg = "=== PARAMS === $(Get-Date)"
 	$msg +=	"download = $downloadMediaOnly"
 	$msg +=	"copy = $copyMediaOnly"
 	$msg +=	"version = $showVersion"
