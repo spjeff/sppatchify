@@ -10,7 +10,7 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.32
+	Version			: 0.33
 	Last Modified	: 08-15-2016
 .LINK
 	Source Code
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.32"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.33"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -284,7 +284,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 			$remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
 		}
 		Start-Sleep 3
-        
+		
 		# Invoke
 		Write-Host ">> invoke on $addr" -Fore Green
 		foreach ($s in $sb) {
@@ -540,16 +540,16 @@ Function DisplayVersion() {
 Function IISStart() {
 	# start IIS pools and sites
 	$sb = {
-        Import-Module WebAdministration
+		Import-Module WebAdministration
 
-        # IISAdmin
-        $iisadmin = Get-Service "IISADMIN"
-        if ($iisadmin) {
+		# IISAdmin
+		$iisadmin = Get-Service "IISADMIN"
+		if ($iisadmin) {
 			Set-Service -Name $iisadmin -StartupType Automatic -ErrorAction SilentlyContinue
 			Start-Service $iisadmin -ErrorAction SilentlyContinue
 		}
 
-        # W3WP
+		# W3WP
 		Start-Service w3svc | Out-Null
 		Get-ChildItem "IIS:\AppPools\" |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
 		Get-WebSite | Start-WebSite | Out-Null
@@ -558,14 +558,14 @@ Function IISStart() {
 }
 
 Function ProductLocal() {
-    # sync local SKU binary to config DB
+	# Sync local SKU binary to config DB
 	$sb = {
-        Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
-        Get-SPProduct -Local
+		Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+		Get-SPProduct -Local
 	}
 	LoopRemoteCmd "Product local SKU on " $sb
 	
-	# display server upgrade
+	# Display server upgrade
 	Write-Host "Farm Servers - Upgrade Status " -Fore Yellow
 	(Get-SPProduct).Servers | Select Servername,InstallStatus | Sort Servername | ft -a
 }
@@ -877,36 +877,36 @@ Function DetectAdmin() {
 
 #region GUI status window
 function newStatus($currentStage) { 
-    # servers (rows)
-    $coll = @()
-    $servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
-    foreach ($server in $servers) {
-        $row = New-Object -TypeName PSObject -Property @{Server=$server.Name; Role=$server.Role}
-        $coll += $row
-    }
+	# servers (rows)
+	$coll = @()
+	$servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
+	foreach ($server in $servers) {
+		$row = New-Object -TypeName PSObject -Property @{Server=$server.Name; Role=$server.Role}
+		$coll += $row
+	}
 
-    # stages (cols)
-    foreach ($row in $coll) {
-        $i = $stages.IndexOf($currentStage)
+	# stages (cols)
+	foreach ($row in $coll) {
+		$i = $stages.IndexOf($currentStage)
 		if ($currentStage -eq "done") {$i = $stages.count}
-        foreach ($s in $stages) {
+		foreach ($s in $stages) {
 			if ($stages.IndexOf($s) -lt $i) {$v = 2} else {$v = 0}
 			$row | Add-Member -MemberType NoteProperty -Name $s -Value $v
-        }
-    }
-    return $coll
+		}
+	}
+	return $coll
 }
 
 function displayStatus($coll, $px, $msg, $msp) {
-    # percent
-    $c = 0
-    foreach ($row in $coll) {
-        foreach ($col in $stages) {
-            if ($row."$col" -eq 2) {
-                $c++
-            }
-        }
-    }
+	# percent
+	$c = 0
+	foreach ($row in $coll) {
+		foreach ($col in $stages) {
+			if ($row."$col" -eq 2) {
+				$c++
+			}
+		}
+	}
 	$total = $coll.count * $stages.count
 	$prct = [Math]::Round(($c / $total) * 100)
 	
@@ -923,35 +923,35 @@ $foot += @"
 $prct = $px/3
 }
 
-    # generate HTML
-    $file = "$root\sppatchify-status.html"
-    $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
+	# generate HTML
+	$file = "$root\sppatchify-status.html"
+	$meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
 	
 	# MSPLOG second table
 	if ($msp) {
 		$foot = ($msp | ConvertTo-Html -Fragment) + $foot
 	}
 
-    # colors
-    $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
-    $html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
-    $html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
-    $html = $html.replace("<td>1</td>","<td style='background-color:yellow'>In Progress</td>")
-    $html = $html.replace("<td>2</td>","<td style='background-color:lightgreen'>Complete</td>")
-    $html | Out-File $file -Force -Confirm:$false
+	# colors
+	$html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
+	$html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
+	$html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
+	$html = $html.replace("<td>1</td>","<td style='background-color:yellow'>In Progress</td>")
+	$html = $html.replace("<td>2</td>","<td style='background-color:lightgreen'>Complete</td>")
+	$html | Out-File $file -Force -Confirm:$false
 
-    launchIE $file
+	launchIE $file
 }
 
 function launchIE($file) {
-    # web browser
-    $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
-    if (!$ieproc) {
-        $global:ie = new-object -comobject InternetExplorer.Application
-        $global:ie.visible = $true
-        $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
-        $global:HWND =  $global:ie.HWND
-    }
+	# web browser
+	$ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
+	if (!$ieproc) {
+		$global:ie = new-object -comobject InternetExplorer.Application
+		$global:ie.visible = $true
+		$global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
+		$global:HWND =  $global:ie.HWND
+	}
 	try {
 		$global:ie.navigate($file)
 	} catch {}
