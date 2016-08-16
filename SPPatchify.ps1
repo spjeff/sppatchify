@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.36
-	Last Modified	: 08-15-2016
+	Version			: 0.37
+	Last Modified	: 08-16-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.36"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.37"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -101,6 +101,9 @@ Function CopyEXE($action) {
 
 Function RunEXE() {
 	Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
+	
+	# Remove MSPLOG
+	LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:$false -ErrorAction SilentlyContinue"
 	
 	# Build CMD
 	$ver = (Get-SPFarm).BuildVersion.Major
@@ -997,7 +1000,6 @@ function Main() {
 		RunConfigWizard
 		ChangeContent $true
 		UpgradeContent
-		CopyEXE "Remove"
 		IISStart
 		DisplayCA
 	}
