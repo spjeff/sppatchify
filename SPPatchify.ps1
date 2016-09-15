@@ -10,8 +10,8 @@
 .NOTES
 	File Name		: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.37
-	Last Modified	: 08-16-2016
+	Version			: 0.42
+	Last Modified	: 09-14-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.37"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.42"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -60,42 +60,57 @@ Function CopyEXE($action) {
 	}
 	$remoteRoot = -join $char
 
-	# Loop servers
+	# Clear old session
+	Get-Job | Remove-Job
+	Get-PSSession | Remove-PSSession
+
+	# Start Jobs
+	foreach ($server in $global:servers) {
+		$addr = $server.Address
+		if ($addr -ne $env:computername) {
+			$s = New-PSSession -ComputerName $env:computername -Credential $global:cred -Authentication CredSSP
+			$cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0 /XX"
+			Write-Host $cmd -Fore Yellow
+			$sb = [Scriptblock]::Create($cmd)
+			Invoke-Command -ScriptBlock $sb -Session $s -AsJob
+		}
+	}
+
+	# Watch Jobs
+	Sleep 5
 	$coll = newStatus("CopyEXE")
 	$counter = 0
-	foreach ($server in $global:servers) {
-		# Progress
-		$addr = $server.Address
-		$prct = [Math]::Round(($counter/$global:servers.Count)*100)
-		Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
-		$counter++
-		
-		# GUI In Progress
-		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
-		displayStatus $coll
-		
-		# Skip current machine
-		if ($addr -ne $env:computername) {
-			if ($action -eq "Copy") {
-				# Copy
-				$files = Get-ChildItem "$root\media\*.*"
-				foreach ($file in $files) {
-					$name = $file.Name
-					$dest = "\\$addr\$remoteRoot\media"
-					mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null
-					mkdir $dest.replace("media","log") -Force -ErrorAction SilentlyContinue | Out-Null
-					ROBOCOPY "media" $dest /J /Z /W:0 /R:0 /XX
+	do {
+		foreach ($server in $global:servers) {
+			# Progress
+			$prct = [Math]::Round(($counter/(Get-Job).Count)*100)
+			Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
+			
+			# GUI In Progress
+			($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
+			displayStatus $coll
+			
+			# Check Job Status
+			foreach ($job in Get-Job) {
+				Get-Job | ft -a
+				if ($job.State -ne "Running") {
+					# GUI Done
+					$addr = $job.Command.Split(";")[0].Replace("#","")
+					($coll |? {$_.Server -eq $addr}).CopyEXE = 2
+					displayStatus $coll
 				}
-			} else {
-				# Delete
-				Remove-Item "\\$addr\$remoteRoot\media\*.*" -confirm:$false
 			}
+			
 		}
-		
-		# GUI Done
-		($coll |? {$_.Server -eq $server.Address}).CopyEXE = 2
-		displayStatus $coll
-	}
+		Sleep 5
+		$pending = Get-Job |? {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
+		$counter = (Get-Job).Count - $pending.Count
+	} while ($pending)
+
+	# Complete
+	Get-Job | ft -a
+	$coll |% {$_.CopyEXE = 2}
+	displayStatus $coll
 	Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
@@ -959,7 +974,7 @@ function Main() {
 	mkdir "$root\log" -ErrorAction SilentlyContinue | Out-Null
 	Start-Transcript $logFile
 		
-	# Params
+	# Parameters
 	$msg = "=== PARAMS === $(Get-Date)"
 	$msg +=	"download = $downloadMediaOnly"
 	$msg +=	"copy = $copyMediaOnly"
@@ -975,6 +990,7 @@ function Main() {
 	if (!$phaseTwo) {
 		if ($copyMediaOnly) {
 			# CMD switch -C (copy media only)
+			ReadIISPW
 			CopyEXE "Copy"
 		} else {
 			# Phase One - patch EXE
@@ -1033,4 +1049,5 @@ function Main() {
 	Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
 	Stop-Transcript
 }
+
 Main
