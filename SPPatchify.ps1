@@ -8,7 +8,7 @@
 
 	Comments and suggestions always welcome!  spjeff@spjeff.com or @spjeff
 .NOTES
-	File Name		: SPPatchify.ps1
+	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
 	Version			: 0.42
 	Last Modified	: 09-14-2016
