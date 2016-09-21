@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.42
-	Last Modified	: 09-14-2016
+	Version			: 0.44
+	Last Modified	: 09-21-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -44,7 +44,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.42"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.44"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -867,6 +867,28 @@ Function DetectAdmin() {
 		Break
 	}
 }
+
+Function SaveServiceInst() {
+	$sos = Get-SPServiceInstance |? {$_.Status -eq "Online"} | Select Id,TypeName,@{n="Server"; e={$_.Server.Address}}
+	$sos | Export-Csv "$root\sos-before.csv" -Force
+}
+
+Function StartServiceInst() {
+	$sos = Import-Csv "$root\sos-before.csv"
+	if ($sos) {
+		foreach ($row in $sos) {
+			$si = Get-SPServiceInstance $row.Id
+			if ($si) {
+				if ($si.Status -ne "Online") {
+					$row | ft -a
+					Write-Host "Starting ... " -Fore Green
+					$si.Provision()
+					Write-Host "OK"
+				}
+			}
+		}
+	}
+}
 #endregion
 
 #region GUI status window
@@ -989,7 +1011,7 @@ function Main() {
 	# Core steps
 	if (!$phaseTwo) {
 		if ($copyMediaOnly) {
-			# CMD switch -C (copy media only)
+			# Copy media only (switch -C)
 			ReadIISPW
 			CopyEXE "Copy"
 		} else {
@@ -998,6 +1020,7 @@ function Main() {
 			EnablePSRemoting
 			ReadIISPW
 			CopyEXE "Copy"
+			SaveServiceInst
 			ChangeDC
 			ChangeServices $false
 			IISStart
@@ -1007,7 +1030,7 @@ function Main() {
 			LocalReboot
 		}
 	} else {
-		# CMD switch -P (phase two) - SP Config Wizard
+		# Phase two (switch -P) SP Config Wizard
 		DetectAdmin
 		ReadIISPW
 		ChangeContent $false
@@ -1017,6 +1040,7 @@ function Main() {
 		ChangeContent $true
 		UpgradeContent
 		IISStart
+		StartServiceInst
 		DisplayCA
 	}
 	
