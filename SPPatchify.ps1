@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.44
-	Last Modified	: 09-21-2016
+	Version			: 0.45
+	Last Modified	: 10-23-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,11 +23,11 @@
 
 [CmdletBinding()]
 param (
-	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm change.  Prep step for real patching later.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
 	[Alias("d")]
 	[switch]$downloadMediaOnly,
 
-	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm change.  Prep step for real patching later.')]
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
 	[Alias("c")]
 	[switch]$copyMediaOnly,
 
@@ -37,7 +37,11 @@ param (
 	
 	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
 	[Alias("p")]
-	[switch]$phaseTwo
+	[switch]$phaseTwo,
+	
+	[Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -o to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
+	[Alias("o")]
+	[switch]$onlineContent
 )
 
 # Plugin
@@ -1033,11 +1037,11 @@ function Main() {
 		# Phase two (switch -P) SP Config Wizard
 		DetectAdmin
 		ReadIISPW
-		ChangeContent $false
+		if (!$onlineContent) {ChangeContent $false}
 		ChangeServices $true
 		ProductLocal
 		RunConfigWizard
-		ChangeContent $true
+		if (!$onlineContent) {ChangeContent $true}
 		UpgradeContent
 		IISStart
 		StartServiceInst
