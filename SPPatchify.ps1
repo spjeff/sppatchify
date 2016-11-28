@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.45
-	Last Modified	: 10-23-2016
+	Version			: 0.46
+	Last Modified	: 11-28-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -1011,6 +1011,7 @@ function Main() {
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
+	LoopRemoteCmd "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
 
 	# Core steps
 	if (!$phaseTwo) {
