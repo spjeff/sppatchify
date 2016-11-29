@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.46
-	Last Modified	: 11-28-2016
+	Version			: 0.47
+	Last Modified	: 11-29-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -541,7 +541,7 @@ Function DisplayCA() {
 	DisplayVersion
 	
 	# open Central Admin
-	$ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication}
+	$ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication -eq $true}
 	$pages = @("PatchStatus.aspx","UpgradeStatus.aspx","FarmServers.aspx")
 	$pages |% {Start-Process ($ca.Url + "_admin/" + $_)}
 }
@@ -688,7 +688,10 @@ Function UpgradeContent() {
 				
 				# Progress
 				$counter = ($track |? {$_.Status -eq "Completed"}).Count
-				$prct = [Math]::Round(($counter/$track.Count)*100)
+				try {
+					$prct = 0
+					$prct = [Math]::Round(($counter/$track.Count)*100)
+				} catch {}
 				Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
 				$track | Format-Table -AutoSize
 				
