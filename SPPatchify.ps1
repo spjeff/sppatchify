@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.47
-	Last Modified	: 11-29-2016
+	Version			: 0.48
+	Last Modified	: 12-28-2016
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -242,6 +242,7 @@ Function LocalReboot() {
 
 #region SP Config Wizard
 Function LoopRemoteCmd($msg, $cmd) {
+	if (!$cmd) {return}
 	#Clean up
 	Get-PSSession | Remove-PSSession
 	
