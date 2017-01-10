@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.48
-	Last Modified	: 12-28-2016
+	Version			: 0.49
+	Last Modified	: 01-10-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -721,8 +721,8 @@ Function UpgradeContent() {
 
 Function ShowMenu($prod) {
 	# Choices
-	$csv = Import-Csv "$root\SPPatchify-Download-CU.csv"
-	$choices = $csv |? {$_.Product -eq $prod} | sort Year,Month -Desc | select Year,Month -Unique
+	$csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select -Property @{n='MonthInt';e={[int]$_.Month}},*
+	$choices = $csv |? {$_.Product -eq $prod} | sort Year,MonthInt -Desc | select Year,Month -Unique
 
 	# Menu
 	Write-Host "Download CU Media to \media\ - $prod" -Fore "Yellow"
