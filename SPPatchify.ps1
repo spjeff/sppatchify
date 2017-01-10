@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.49
+	Version			: 0.50
 	Last Modified	: 01-10-2017
 .LINK
 	Source Code
@@ -1015,7 +1015,8 @@ function Main() {
 
 	# Local farm servers
 	$global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
-	LoopRemoteCmd "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
+	ReadIISPW
+	LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
 
 	# Core steps
 	if (!$phaseTwo) {
