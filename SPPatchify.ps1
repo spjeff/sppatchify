@@ -112,7 +112,7 @@ Function CopyEXE($action) {
     } while ($pending)
 
     # Complete
-    Get-Job | ft -a
+    Get-Job | Format-Table -a
     $coll |% {$_.CopyEXE = 2}
     displayStatus $coll
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
