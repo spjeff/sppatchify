@@ -48,7 +48,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.44"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.51"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -1015,13 +1015,16 @@ function Main() {
         Exit
     }
 	
-    # Start time
+    # Start LOG
     $start = Get-Date
     $when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
     $logFile = "$root\log\SPPatchify-$when.txt"
     mkdir "$root\log" -ErrorAction SilentlyContinue | Out-Null
     Start-Transcript $logFile
-		
+
+    # Version
+    "SPPatchify version 0.51 last modified 01-29-2017"
+	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
     $msg +=	"download = $downloadMediaOnly"
