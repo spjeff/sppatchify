@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.51
-	Last Modified	: 01-29-2017
+	Version			: 0.52
+	Last Modified	: 03-10-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -87,8 +87,10 @@ Function CopyEXE($action) {
     do {
         foreach ($server in $global:servers) {
             # Progress
-            $prct = [Math]::Round(($counter/(Get-Job).Count)*100)
-            Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
+            if (Get-Job) {
+                $prct = [Math]::Round(($counter/(Get-Job).Count)*100)
+                Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
+            }
 			
             # GUI In Progress
             ($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
@@ -194,7 +196,7 @@ Function WaitReboot() {
     Write-Host "Wait 60 sec..."
     Start-Sleep 60
 	
-    #Clean up
+    # Clean up
     Get-PSSession | Remove-PSSession
 	
     # Verify machines online
@@ -206,7 +208,7 @@ Function WaitReboot() {
         Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
         $counter++
 		
-        # Remote Posh
+        # Remote PowerShell session
         do {
             $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
             if (!$remote) {
@@ -217,15 +219,14 @@ Function WaitReboot() {
         } while (!$remote)
     }
 	
-    #Clean up
+    # Clean up
     Get-PSSession | Remove-PSSession
 }
 
 Function LocalReboot() {
-    # product install status
+    # Product install status
 	
-
-    # create Regkey
+    # Create Regkey
     New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name RunOnce -ErrorAction SilentlyContinue | Out-Null
     New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
 	
@@ -245,10 +246,10 @@ Function LoopRemoteCmd($msg, $cmd) {
     if (!$cmd) {
         return
     }
-    #Clean up
+    # Clean up
     Get-PSSession | Remove-PSSession
 	
-    #GUI
+    # GUI
     switch -wildcard ($msg) {
         "STOP services on*" {
             $stage = "StopSvc"
@@ -443,7 +444,7 @@ Function ChangeContent($state) {
         # Remove content
         $dbs = Get-SPContentDatabase
         if ($dbs) {
-            $dbs |% {$wa = $_.WebApplication.Url; $_ | select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv"
+            $dbs |% {$wa = $_.WebApplication.Url; $_ | select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
             $dbs |% {
                 "$($_.Name),$($_.NormalizedDataSource)"
                 Dismount-SPContentDatabase $_ -Confirm:$false
@@ -490,7 +491,7 @@ Function ReadIISPW {
     # Start IISAdmin if needed
     $iisadmin = Get-Service IISADMIN
     if ($iisadmin.Status -ne "Running") {
-        #set Automatic and Start
+        # Set Automatic and Start
         Set-Service -Name IISADMIN -StartupType Automatic -ErrorAction SilentlyContinue
         Start-Service IISADMIN -ErrorAction SilentlyContinue
     }
@@ -499,7 +500,7 @@ Function ReadIISPW {
     Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
     $m = Get-Module WebAdministration
     if ($m) {
-        #PowerShell ver 2.0+ IIS technique
+        # PowerShell ver 2.0+ IIS technique
         $appPools = Get-ChildItem "IIS:\AppPools\"
         foreach ($pool in $appPools) {	
             if ($pool.processModel.userName -like "*$user") {
@@ -511,7 +512,7 @@ Function ReadIISPW {
             }
         }
     } else {
-        #PowerShell ver 3.0+ WMI technique
+        # PowerShell ver 3.0+ WMI technique
         $appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | select WAMUserName, WAMUserPass
         foreach ($pool in $appPools) {	
             if ($pool.WAMUserName -like "*$user") {
@@ -534,7 +535,7 @@ Function ReadIISPW {
 }
 
 Function DisplayCA() {
-    # version DLL File
+    # Version DLL File
     $sb = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null;
         $ver = (Get-SPFarm).BuildVersion.Major;
@@ -542,16 +543,16 @@ Function DisplayCA() {
     }
     LoopRemoteCmd "Get file version on " $sb
 	
-    # display Version
+    # Display Version
     DisplayVersion
 	
-    # open Central Admin
+    # Open Central Admin
     $ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication -eq $true}
     $pages = @("PatchStatus.aspx","UpgradeStatus.aspx","FarmServers.aspx")
     $pages |% {Start-Process ($ca.Url + "_admin/" + $_)}
 }
 Function DisplayVersion() {
-    # version Max Patch
+    # Version Max Patch
     $maxv = 0
     $f = Get-SPFarm
     $p = Get-SPProduct
@@ -569,7 +570,7 @@ Function DisplayVersion() {
     Write-Host "Farm Build  = $($f.BuildVersion)"
 }
 Function IISStart() {
-    # start IIS pools and sites
+    # Start IIS pools and sites
     $sb = {
         Import-Module WebAdministration
 
@@ -762,6 +763,7 @@ Function ShowMenu($prod) {
 } 
 
 Function GetMonth($mo) {
+    # Convert integer to three letter month name
     try {
         $mo = (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($mo)
     } catch {
@@ -771,6 +773,7 @@ Function GetMonth($mo) {
 }
 
 Function GetMonthInt($name) {
+    # Convert three letter month name to integer
     1..12 |% {
         if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
             return $_
@@ -870,6 +873,7 @@ Function PatchMenu() {
 }
 
 Function DetectAdmin() {
+    # Are we running as local Administrator
     $wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $prp = New-Object System.Security.Principal.WindowsPrincipal($wid)
     $adm = [System.Security.Principal.WindowsBuiltInRole]::Administrator
@@ -886,12 +890,14 @@ Function DetectAdmin() {
 }
 
 Function SaveServiceInst() {
+    # Save config to CSV
     $sos = Get-SPServiceInstance |? {$_.Status -eq "Online"} | Select Id,TypeName,@{n="Server"; e={$_.Server.Address}}
-    $sos | Export-Csv "$root\sos-before.csv" -Force
+    $sos | Export-Csv "$root\log\sos-before.csv" -Force -NoTypeInformation
 }
 
 Function StartServiceInst() {
-    $sos = Import-Csv "$root\sos-before.csv"
+    # Restore config from CSV
+    $sos = Import-Csv "$root\log\sos-before.csv"
     if ($sos) {
         foreach ($row in $sos) {
             $si = Get-SPServiceInstance $row.Id
@@ -910,7 +916,7 @@ Function StartServiceInst() {
 
 #region GUI status window
 function newStatus($currentStage) { 
-    # servers (rows)
+    # Servers (rows)
     $coll = @()
     $servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
     foreach ($server in $servers) {
@@ -918,7 +924,7 @@ function newStatus($currentStage) {
         $coll += $row
     }
 
-    # stages (cols)
+    # Stages (cols)
     foreach ($row in $coll) {
         $i = $stages.IndexOf($currentStage)
         if ($currentStage -eq "done") {
@@ -937,7 +943,7 @@ function newStatus($currentStage) {
 }
 
 function displayStatus($coll, $px, $msg, $msp) {
-    # percent
+    # Percent display
     $c = 0
     foreach ($row in $coll) {
         foreach ($col in $stages) {
@@ -953,7 +959,7 @@ function displayStatus($coll, $px, $msg, $msp) {
     $total = $rowCount * $stages.count
     $prct = [Math]::Round(($c / $total) * 100)
 	
-    # progress bar
+    # Progress bar
     $foot = "<div style='text-align:right'>{0}</div>" -f (Get-Date)
     if ($px) {
         $foot += @"
@@ -966,7 +972,7 @@ function displayStatus($coll, $px, $msg, $msp) {
         $prct = $px/3
     }
 
-    # generate HTML
+    # Generate HTML
     $file = "$root\sppatchify-status.html"
     $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
 	
@@ -975,7 +981,7 @@ function displayStatus($coll, $px, $msg, $msp) {
         $foot = ($msp | ConvertTo-Html -Fragment) + $foot
     }
 
-    # colors
+    # Colors
     $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
     $html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
     $html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
@@ -987,7 +993,7 @@ function displayStatus($coll, $px, $msg, $msp) {
 }
 
 function launchIE($file) {
-    # web browser
+    # Web browser
     $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
     if (!$ieproc) {
         $global:ie = new-object -comobject InternetExplorer.Application
@@ -1003,13 +1009,13 @@ function launchIE($file) {
 #endregion
 
 function Main() {
-    # download media
+    # Download media
     if ($downloadMediaOnly) {
         PatchMenu
         Exit
     }
 	
-    # display version
+    # Display version
     if ($showVersion) {
         DisplayVersion
         Exit
@@ -1091,7 +1097,7 @@ function Main() {
     $regKey = "SPPatchify"
     $regName = "PhaseOneTotalHours"
     if (!$phaseTwo) {
-        # create Regkey
+        # Create Regkey
         New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
         New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
     } else {
