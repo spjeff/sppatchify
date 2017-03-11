@@ -813,7 +813,8 @@ Function PatchMenu() {
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
         $ver = (Get-SPFarm).BuildVersion.Major
     }
-    if (Get-Command Get-SPProjectWebInstance -ErrorAction SilentlyContinue) {
+	$sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+    if ($sppl) {
         if ($ver -ne 16) {
             $sku = "PROJ"
         }
