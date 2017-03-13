@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.54
-	Last Modified	: 03-10-2017
+	Version			: 0.55
+	Last Modified	: 03-13-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -48,7 +48,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.51"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.55"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
@@ -305,6 +305,7 @@ Function LoopRemoteCmd($msg, $cmd) {
         }
 		
         # Remote Posh
+		Write-Host ">> invoke on $addr" -Fore "Green"
         $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
         if (!$remote) {
             $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
@@ -312,7 +313,6 @@ Function LoopRemoteCmd($msg, $cmd) {
         Start-Sleep 3
 		
         # Invoke
-        Write-Host ">> invoke on $addr" -Fore "Green"
         foreach ($s in $sb) {
             Write-Host $s.ToString()
             Invoke-Command -Session $remote -ScriptBlock $s
@@ -1030,7 +1030,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.51 last modified 01-29-2017"
+    "SPPatchify version 0.55 last modified 03-13-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
