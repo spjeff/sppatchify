@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.55
-	Last Modified	: 03-13-2017
+	Version			: 0.56
+	Last Modified	: 03-17-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,23 +23,23 @@
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -d to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
     [Alias("d")]
     [switch]$downloadMediaOnly,
 
-    [Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -c to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
     [Alias("c")]
     [switch]$copyMediaOnly,
 
-    [Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
     [Alias("v")]
     [switch]$showVersion,	
 	
-    [Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -p to execute Phase Two after local reboot.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p to execute Phase Two after local reboot.')]
     [Alias("p")]
     [switch]$phaseTwo,
 	
-    [Parameter(Mandatory=$False, ValueFromPipeline=$false, HelpMessage='Use -o to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
     [switch]$onlineContent
 )
@@ -48,10 +48,10 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.55"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.56"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$stages = @("CopyEXE","StopSvc","RunEXE","StartSvc","ProdLocal","ConfigWiz")
+$stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
 
 #region binary EXE
 Function CopyEXE($action) {
@@ -88,7 +88,7 @@ Function CopyEXE($action) {
         foreach ($server in $global:servers) {
             # Progress
             if (Get-Job) {
-                $prct = [Math]::Round(($counter/(Get-Job).Count)*100)
+                $prct = [Math]::Round(($counter / (Get-Job).Count) * 100)
                 Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
             }
 			
@@ -101,7 +101,7 @@ Function CopyEXE($action) {
                 Get-Job | ft -a
                 if ($job.State -ne "Running") {
                     # GUI Done
-                    $addr = $job.Command.Split(";")[0].Replace("#","")
+                    $addr = $job.Command.Split(";")[0].Replace("#", "")
                     ($coll |? {$_.Server -eq $addr}).CopyEXE = 2
                     displayStatus $coll
                 }
@@ -111,13 +111,38 @@ Function CopyEXE($action) {
         Start-Sleep 5
         $pending = Get-Job |? {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
         $counter = (Get-Job).Count - $pending.Count
-    } while ($pending)
+    }
+    while ($pending)
 
     # Complete
     Get-Job | Format-Table -a
-    $coll |% {$_.CopyEXE = 2}
+    $coll | % {$_.CopyEXE = 2}
     displayStatus $coll
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
+}
+
+Function SafetyEXE() {
+    Write-Host "===== SafetyEXE ===== $(Get-Date)" -Fore "Yellow"
+
+    # Count number of files.   Must be 3 for SP2013 (major ver 15)
+
+    # Build CMD
+    $ver = (Get-SPFarm).BuildVersion.Major
+    if ($ver -eq 15) {
+        foreach ($server in $global:servers) {
+            $addr = $server.Address
+            $c = (Get-ChildItem "\\$addr\$remoteRoot\media").Count
+            if ($c -ne 3) {
+                $halt = $true
+                Write-Host "MEDIA ERROR - Expected 3 files on \\$addr\$remoteRoot\media" -Fore Red
+            }
+        }
+
+        # Halt
+        if ($halt) {
+            Exit
+        }
+    }
 }
 
 Function RunEXE() {
@@ -131,10 +156,10 @@ Function RunEXE() {
     $files = Get-ChildItem "$root\media\*.exe" | sort Name
     foreach ($f in $files) {
         $name = $f.Name
-        $patchName = $name.replace(".exe","")
+        $patchName = $name.replace(".exe", "")
         $cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
         if ($ver -eq 16) {
-            $cmd = $cmd.replace("forcerestart","norestart")
+            $cmd = $cmd.replace("forcerestart", "norestart")
         }
         LoopRemoteCmd "Run EXE on " $cmd
         WaitEXE $patchName
@@ -162,7 +187,7 @@ Function WaitEXE($patchName) {
     foreach ($server in $global:servers) {	
         # Progress
         $addr = $server.Address
-        $prct =  [Math]::Round(($counter/$global:servers.Count)*100)
+        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
         Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
         $counter++
 		
@@ -179,13 +204,14 @@ Function WaitEXE($patchName) {
             $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
             $sb = [Scriptblock]::Create($cmd)
             $msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-            $msp = $msp | select Server,Count,LastWriteTime | sort LastWriteTime, Server -desc
+            $msp = $msp | select Server, Count, LastWriteTime | sort LastWriteTime, Server -desc
 			
             # HTML view
             $coll = newStatus("RunEXE")
             ($coll |? {$_.Server -eq $addr}).RunEXE = 1
             displayStatus $coll $false $false $msp
-        } while ($proc)
+        }
+        while ($proc)
     }
 }
 
@@ -204,7 +230,7 @@ Function WaitReboot() {
     foreach ($server in $global:servers) {
         # Progress
         $addr = $server.Address
-        $prct =  [Math]::Round(($counter/$global:servers.Count)*100)
+        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
         Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
         $counter++
 		
@@ -216,7 +242,8 @@ Function WaitReboot() {
             }
             Write-Host "."  -NoNewLine
             Start-Sleep 5
-        } while (!$remote)
+        }
+        while (!$remote)
     }
 	
     # Clean up
@@ -283,18 +310,20 @@ Function LoopRemoteCmd($msg, $cmd) {
         # Script block
         if ($cmd.GetType().Name -eq "String") {
             if ($env:computername -eq $server.Address) {
-                $runCmd = $cmd -replace "forcerestart","norestart"
-            } else {
+                $runCmd = $cmd -replace "forcerestart", "norestart"
+            }
+            else {
                 $runCmd = $cmd
             }
             $sb = [ScriptBlock]::Create($runCmd)
-        } else {
+        }
+        else {
             $sb = $cmd
         }
 	
         # Progress
         $addr = $server.Address
-        $prct =  [Math]::Round(($counter/$global:servers.Count)*100)
+        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
         Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
         $counter++
 		
@@ -305,7 +334,7 @@ Function LoopRemoteCmd($msg, $cmd) {
         }
 		
         # Remote Posh
-		Write-Host ">> invoke on $addr" -Fore "Green"
+        Write-Host ">> invoke on $addr" -Fore "Green"
         $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
         if (!$remote) {
             $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
@@ -349,16 +378,19 @@ Function ChangeDC() {
                         Write-Host $computer $hostInfo.Status
                         Start-Sleep 5
                         $counter++
-                    } catch {
+                    }
+                    catch {
                         break
                     }
-                } while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
+                }
+                while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
 				
                 # Force stop
                 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
                 Stop-SPDistributedCacheServiceInstance
             }
-        } catch {
+        }
+        catch {
         }
     }
     LoopRemoteCmd "Stop Distributed Cache on " $sb
@@ -371,28 +403,29 @@ Function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("IISAdmin","SPTimerV4","SQLBrowser","Schedule") |% {
+            @("IISAdmin", "SPTimerV4", "SQLBrowser", "Schedule") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch15","SPSearchHostController") |% {
+            @("OSearch15", "SPSearchHostController") | % {
                 Start-Service $_ -ErrorAction SilentlyContinue
             }
             Start-Process 'iisreset.exe' -ArgumentList '/start' -Wait -PassThru -NoNewWindow | Out-Null
         }
-    } else {
+    }
+    else {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("IISAdmin","SPTimerV4","SQLBrowser","Schedule") |% {
+            @("IISAdmin", "SPTimerV4", "SQLBrowser", "Schedule") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch15","SPSearchHostController") |% {
+            @("OSearch15", "SPSearchHostController") | % {
                 Stop-Service $_ -ErrorAction SilentlyContinue
             }
         }
@@ -404,10 +437,12 @@ Function ChangeServices($state) {
         $ssa = Get-SPEenterpriseSearchServiceApplication 
         if ($state) {
             $ssa.resume()
-        } else {
+        }
+        else {
             $ssa.pause()
         }
-    } catch {
+    }
+    catch {
     }
 	
     LoopRemoteCmd "$action services on " $sb
@@ -428,13 +463,13 @@ Function RunConfigWizard() {
             "psconfig.exe $options" | Out-File $file -Force
         }
     }
-    LoopRemoteCmd "Save B2B shortcut on " @($shared,$b2b)
+    LoopRemoteCmd "Save B2B shortcut on " @($shared, $b2b)
 	
     # Run Config Wizard
     $wiz = {
         & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources"
     }
-    LoopRemoteCmd "Run Config Wizard on " @($shared,$wiz)
+    LoopRemoteCmd "Run Config Wizard on " @($shared, $wiz)
 }
 
 Function ChangeContent($state) {
@@ -444,23 +479,24 @@ Function ChangeContent($state) {
         # Remove content
         $dbs = Get-SPContentDatabase
         if ($dbs) {
-            $dbs |% {$wa = $_.WebApplication.Url; $_ | select Name,NormalizedDataSource,@{n="WebApp";e={$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
-            $dbs |% {
+            $dbs | % {$wa = $_.WebApplication.Url; $_ | select Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
+            $dbs | % {
                 "$($_.Name),$($_.NormalizedDataSource)"
                 Dismount-SPContentDatabase $_ -Confirm:$false
             }
         }
-    } else {
+    }
+    else {
         # Add content
         $dbs = Import-Csv "$root\log\contentdbs-$when.csv"
         # Loop databases
         $counter = 0
-        $dbs |% {
+        $dbs | % {
             $name = $_.Name
             $name
 			
             # Progress
-            $prct =  [Math]::Round(($counter/$dbs.Count)*100)
+            $prct = [Math]::Round(($counter / $dbs.Count) * 100)
             Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
             $counter++
 		
@@ -511,7 +547,8 @@ Function ReadIISPW {
                 }
             }
         }
-    } else {
+    }
+    else {
         # PowerShell ver 3.0+ WMI technique
         $appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | select WAMUserName, WAMUserPass
         foreach ($pool in $appPools) {	
@@ -528,10 +565,11 @@ Function ReadIISPW {
     # Prompt for password
     if (!$pass) {
         $sec = Read-Host "Enter password: " -AsSecureString
-    } else {
+    }
+    else {
         $sec = $pass | ConvertTo-SecureString -AsPlainText -Force
     }
-    $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user",$sec
+    $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user", $sec
 }
 
 Function DisplayCA() {
@@ -539,7 +577,7 @@ Function DisplayCA() {
     $sb = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null;
         $ver = (Get-SPFarm).BuildVersion.Major;
-        [System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion,@{N='PC'; E={$env:computername}}
+        [System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion, @{N = 'PC'; E = {$env:computername}}
     }
     LoopRemoteCmd "Get file version on " $sb
 	
@@ -548,8 +586,8 @@ Function DisplayCA() {
 	
     # Open Central Admin
     $ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication -eq $true}
-    $pages = @("PatchStatus.aspx","UpgradeStatus.aspx","FarmServers.aspx")
-    $pages |% {Start-Process ($ca.Url + "_admin/" + $_)}
+    $pages = @("PatchStatus.aspx", "UpgradeStatus.aspx", "FarmServers.aspx")
+    $pages | % {Start-Process ($ca.Url + "_admin/" + $_)}
 }
 Function DisplayVersion() {
     # Version Max Patch
@@ -583,7 +621,7 @@ Function IISStart() {
 
         # W3WP
         Start-Service w3svc | Out-Null
-        Get-ChildItem "IIS:\AppPools\" |% {$n=$_.Name; Start-WebAppPool $n | Out-Null}
+        Get-ChildItem "IIS:\AppPools\" | % {$n = $_.Name; Start-WebAppPool $n | Out-Null}
         Get-WebSite | Start-WebSite | Out-Null
     }
     LoopRemoteCmd "Start IIS on " $sb
@@ -599,7 +637,7 @@ Function ProductLocal() {
 	
     # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
-    (Get-SPProduct).Servers | Select Servername,InstallStatus | Sort Servername | ft -a
+    (Get-SPProduct).Servers | Select Servername, InstallStatus | Sort Servername | ft -a
 }
 
 Function UpgradeContent() {
@@ -616,7 +654,7 @@ Function UpgradeContent() {
         $pc = $global:servers[$mod].Address
 		
         # Collect
-        $obj = New-Object -TypeName PSObject -Prop (@{"Name"=$db.Name;"Id"=$db.Id;"UpgradePC"=$pc;"JID"=0;"Status"="New"})
+        $obj = New-Object -TypeName PSObject -Prop (@{"Name" = $db.Name; "Id" = $db.Id; "UpgradePC" = $pc; "JID" = 0; "Status" = "New"})
         $track += $obj
         $i++
     }
@@ -650,10 +688,12 @@ Function UpgradeContent() {
                 if ($job.State -eq "Completed") {
                     # Update DB tracking
                     $db.Status = "Completed"
-                } elseif ($job.State -eq "Failed") {
+                }
+                elseif ($job.State -eq "Failed") {
                     # Update DB tracking
                     $db.Status = "Failed"
-                } else {
+                }
+                else {
                     Write-host "-" -NoNewline
                 }
             }
@@ -670,17 +710,18 @@ Function UpgradeContent() {
                 if ($avail) {
                     if ($avail -is [array]) {
                         $row = $avail[0]
-                    } else {
+                    }
+                    else {
                         $row = $avail
                     }
 				
                     # Kick off new worker
                     $id = $row.Id
                     $name = $row.Name
-                    $remoteStr = "`$cmd = New-Object System.Diagnostics.ProcessStartInfo; "+
-                    "`$cmd.FileName = 'powershell.exe'; "+
-                    "`$internal = Add-PSSnapin Microsoft.SharePoint.Powershell -ErrorAction SilentlyContinue | Out-Null; Upgrade-SPContentDatabase -Id $id -Confirm:`$false; "+
-                    "`$cmd.Arguments = '-NoProfile -Command ""$internal""'; "+
+                    $remoteStr = "`$cmd = New-Object System.Diagnostics.ProcessStartInfo; " + 
+                    "`$cmd.FileName = 'powershell.exe'; " + 
+                    "`$internal = Add-PSSnapin Microsoft.SharePoint.Powershell -ErrorAction SilentlyContinue | Out-Null; Upgrade-SPContentDatabase -Id $id -Confirm:`$false; " + 
+                    "`$cmd.Arguments = '-NoProfile -Command ""$internal""'; " + 
                     "[System.Diagnostics.Process]::Start(`$cmd);"
 					
                     # Run on remote server
@@ -700,29 +741,31 @@ Function UpgradeContent() {
                 $counter = ($track |? {$_.Status -eq "Completed"}).Count
                 try {
                     $prct = 0
-                    $prct = [Math]::Round(($counter/$track.Count)*100)
-                } catch {
+                    $prct = [Math]::Round(($counter / $track.Count) * 100)
+                }
+                catch {
                 }
                 Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
                 $track | Format-Table -AutoSize
 				
                 # GUI
                 $msg = "Upgrading Content DB: $name ($prct %) - $counter of $($track.Count)"
-                displayStatus $coll ($prct*3) $msg
+                displayStatus $coll ($prct * 3) $msg
                 Start-Sleep 3
             }
         }
 
         # Latest counter
         $remain = $track |? {$_.status -ne "Completed" -and $_.status -ne "Failed"}
-    } while ($remain)
+    }
+    while ($remain)
     Write-Host "===== Upgrade Content Databases DONE ===== $(Get-Date)"
     $track | group status | Format-Table -AutoSize
     $track | Format-Table -AutoSize
 	
     # GUI
     $msg = "Upgrade Content DB Complete (100 %)"
-    displayStatus $coll (100*3) $msg
+    displayStatus $coll (100 * 3) $msg
 	
     # Clean up
     Get-PSSession | Remove-PSSession
@@ -731,22 +774,23 @@ Function UpgradeContent() {
 
 Function ShowMenu($prod) {
     # Choices
-    $csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select -Property @{n='MonthInt';e={[int]$_.Month}},*
-    $choices = $csv |? {$_.Product -eq $prod} | sort Year,MonthInt -Desc | select Year,Month -Unique
+    $csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select -Property @{n = 'MonthInt'; e = {[int]$_.Month}}, *
+    $choices = $csv |? {$_.Product -eq $prod} | sort Year, MonthInt -Desc | select Year, Month -Unique
 
     # Menu
     Write-Host "Download CU Media to \media\ - $prod" -Fore "Yellow"
     Write-Host "---------"
     $menu = @()
     $i = 0
-    $choices |% {
+    $choices | % {
         $n = (getMonth($_.Month)) + " " + ($_.Year)
         $menu += $n
         if ($i -eq 0) {
             $default = $n
             $n += "[default] <=="
             Write-Host "$i $n" -Fore "Green"
-        } else {
+        }
+        else {
             Write-Host "$i $n"
         }
         $i++
@@ -756,7 +800,8 @@ Function ShowMenu($prod) {
     $sel = Read-Host "Select month. Press [enter] for default"
     if (!$sel) {
         $sel = $default
-    } else {
+    }
+    else {
         $sel = $menu[$sel]
     }
     $global:selmonth = $sel
@@ -766,7 +811,8 @@ Function GetMonth($mo) {
     # Convert integer to three letter month name
     try {
         $mo = (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($mo)
-    } catch {
+    }
+    catch {
         return $mo
     }
     return $mo
@@ -774,7 +820,7 @@ Function GetMonth($mo) {
 
 Function GetMonthInt($name) {
     # Convert three letter month name to integer
-    1..12 |% {
+    1 .. 12 | % {
         if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
             return $_
         }
@@ -797,7 +843,7 @@ Function PatchMenu() {
     $source = "https://raw.githubusercontent.com/spjeff/sppatchify/master/SPPatchify-Download-CU.csv"
     $local = "$root\SPPatchify-Download-CU.csv"
     $wc = New-Object System.Net.Webclient
-    $dest = $local.Replace(".csv","-temp.csv")
+    $dest = $local.Replace(".csv", "-temp.csv")
     $wc.DownloadFile($source, $dest)
 	
     # Overwrite if downloaded OK
@@ -813,7 +859,7 @@ Function PatchMenu() {
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
         $ver = (Get-SPFarm).BuildVersion.Major
     }
-	$sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+    $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
     if ($sppl) {
         if ($ver -ne 16) {
             $sku = "PROJ"
@@ -858,13 +904,15 @@ Function PatchMenu() {
 
         if (Test-Path $dest) {
             Write-Host "Found $name"
-        } else {
+        }
+        else {
             Write-Host "Downloading $name"
             if ($bits) {
                 # pefer BITS
                 Write-Host "BITS $dest"
                 Start-BitsTransfer -Source $file.URL -Destination $dest
-            } else {
+            }
+            else {
                 # Dot Net
                 Write-Host "WebClient $dest"
                 (New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
@@ -892,7 +940,7 @@ Function DetectAdmin() {
 
 Function SaveServiceInst() {
     # Save config to CSV
-    $sos = Get-SPServiceInstance |? {$_.Status -eq "Online"} | Select Id,TypeName,@{n="Server"; e={$_.Server.Address}}
+    $sos = Get-SPServiceInstance |? {$_.Status -eq "Online"} | Select Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
     $sos | Export-Csv "$root\log\sos-before.csv" -Force -NoTypeInformation
 }
 
@@ -921,7 +969,7 @@ function newStatus($currentStage) {
     $coll = @()
     $servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
     foreach ($server in $servers) {
-        $row = New-Object -TypeName PSObject -Property @{Server=$server.Name; Role=$server.Role}
+        $row = New-Object -TypeName PSObject -Property @{Server = $server.Name; Role = $server.Role}
         $coll += $row
     }
 
@@ -934,7 +982,8 @@ function newStatus($currentStage) {
         foreach ($s in $stages) {
             if ($stages.IndexOf($s) -lt $i) {
                 $v = 2
-            } else {
+            }
+            else {
                 $v = 0
             }
             $row | Add-Member -MemberType NoteProperty -Name $s -Value $v
@@ -969,8 +1018,8 @@ function displayStatus($coll, $px, $msg, $msp) {
 <div style='width:300px;border:1px solid black'>
 <div style='width:{1}px;height:20px;background-color:blue;'></div>
 </div>
-"@ -f $msg,$px
-        $prct = $px/3
+"@ -f $msg, $px
+        $prct = $px / 3
     }
 
     # Generate HTML
@@ -984,10 +1033,10 @@ function displayStatus($coll, $px, $msg, $msp) {
 
     # Colors
     $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
-    $html = $html.replace("<table","<table border=0 cellpadding=6 cellspacing=0")
-    $html = $html.replace("<td>0</td>","<td style='background-color:lightgray'>Not Started</td>")
-    $html = $html.replace("<td>1</td>","<td style='background-color:yellow'>In Progress</td>")
-    $html = $html.replace("<td>2</td>","<td style='background-color:lightgreen'>Complete</td>")
+    $html = $html.replace("<table", "<table border=0 cellpadding=6 cellspacing=0")
+    $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
+    $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
+    $html = $html.replace("<td>2</td>", "<td style='background-color:lightgreen'>Complete</td>")
     $html | Out-File $file -Force -Confirm:$false
 
     launchIE $file
@@ -1000,11 +1049,12 @@ function launchIE($file) {
         $global:ie = new-object -comobject InternetExplorer.Application
         $global:ie.visible = $true
         $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
-        $global:HWND =  $global:ie.HWND
+        $global:HWND = $global:ie.HWND
     }
     try {
         $global:ie.navigate($file)
-    } catch {
+    }
+    catch {
     }
 }
 #endregion
@@ -1030,7 +1080,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.55 last modified 03-13-2017"
+    "SPPatchify version 0.56 last modified 03-17-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1052,12 +1102,14 @@ function Main() {
             # Copy media only (switch -C)
             ReadIISPW
             CopyEXE "Copy"
-        } else {
+        }
+        else {
             # Phase One - patch EXE
             PatchMenu
             EnablePSRemoting
             ReadIISPW
             CopyEXE "Copy"
+            SafetyEXE
             SaveServiceInst
             ChangeDC
             ChangeServices $false
@@ -1067,7 +1119,8 @@ function Main() {
             ProductLocal
             LocalReboot
         }
-    } else {
+    }
+    else {
         # Phase two (switch -P) SP Config Wizard
         DetectAdmin
         ReadIISPW
@@ -1101,7 +1154,8 @@ function Main() {
         # Create Regkey
         New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
         New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
-    } else {
+    }
+    else {
         $thKey = Get-ItemProperty -Path "$regHive\$regKey" -ErrorAction SilentlyContinue
         if ($thKey) {
             $h = [double]($thKey."$regName")
