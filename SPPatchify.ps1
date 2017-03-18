@@ -157,6 +157,7 @@ Function RunEXE() {
     foreach ($f in $files) {
         $name = $f.Name
         $patchName = $name.replace(".exe", "")
+		# PACKAGE.BYPASS.DETECTION.CHECK=1
         $cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
         if ($ver -eq 16) {
             $cmd = $cmd.replace("forcerestart", "norestart")
