@@ -73,7 +73,7 @@ Function CopyEXE($action) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
             $s = New-PSSession -ComputerName $env:computername -Credential $global:cred -Authentication CredSSP
-            $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0 /XX"
+            $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0"
             Write-Host $cmd -Fore Yellow
             $sb = [Scriptblock]::Create($cmd)
             Invoke-Command -ScriptBlock $sb -Session $s -AsJob
@@ -121,6 +121,19 @@ Function CopyEXE($action) {
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
+Function SafetyInstallRequired() {
+	# Display server upgrade
+    Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
+    (Get-SPProduct).Servers | Select Servername, InstallStatus | Sort Servername | ft -a
+	
+	$halt = (Get-SPProduct).Servers |? {$_.InstallStatus -eq "InstallRequired"}
+	if ($halt) {
+		$halt | ft -a
+		Write-Host "HALT - MEDIA ERROR - Install on servers" -Fore Red
+		Exit
+	}
+}
+
 Function SafetyEXE() {
     Write-Host "===== SafetyEXE ===== $(Get-Date)" -Fore "Yellow"
 
@@ -134,7 +147,7 @@ Function SafetyEXE() {
             $c = (Get-ChildItem "\\$addr\$remoteRoot\media").Count
             if ($c -ne 3) {
                 $halt = $true
-                Write-Host "MEDIA ERROR - Expected 3 files on \\$addr\$remoteRoot\media" -Fore Red
+                Write-Host "HALT - MEDIA ERROR - Expected 3 files on \\$addr\$remoteRoot\media" -Fore Red
             }
         }
 
@@ -404,7 +417,7 @@ Function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("IISAdmin", "SPTimerV4", "SQLBrowser", "Schedule") | % {
+            @("IISAdmin", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -955,7 +968,14 @@ Function StartServiceInst() {
                 if ($si.Status -ne "Online") {
                     $row | ft -a
                     Write-Host "Starting ... " -Fore Green
-                    $si.Provision()
+					if ($si.TypeName -ne "User Profile Synchronization Service") {
+                        # UPS needs password input to start via Central Admin GUI
+						$si.Provision()
+					}
+                    if ($si.TypeName -eq "Distributed Cache") {
+                        # Special command to initialize
+                        Add-SPDistributedCacheServiceInstance
+                    }
                     Write-Host "OK"
                 }
             }
@@ -1123,6 +1143,7 @@ function Main() {
     }
     else {
         # Phase two (switch -P) SP Config Wizard
+		SafetyInstallRequired
         DetectAdmin
         ReadIISPW
         if (!$onlineContent) {
