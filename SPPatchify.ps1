@@ -975,6 +975,7 @@ Function StartServiceInst() {
                     if ($si.TypeName -eq "Distributed Cache") {
                         # Special command to initialize
                         Add-SPDistributedCacheServiceInstance
+						$si.Provision()
                     }
                     Write-Host "OK"
                 }
