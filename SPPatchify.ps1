@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.56
-	Last Modified	: 03-17-2017
+	Version			: 0.57
+	Last Modified	: 03-21-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -35,6 +35,10 @@ param (
     [Alias("v")]
     [switch]$showVersion,	
 	
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b to execute Phase One only (run binary)')]
+    [Alias("b")]
+    [switch]$phaseOneBinary,
+
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p to execute Phase Two after local reboot.')]
     [Alias("p")]
     [switch]$phaseTwo,
@@ -48,7 +52,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.56"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.57"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -122,16 +126,16 @@ Function CopyEXE($action) {
 }
 
 Function SafetyInstallRequired() {
-	# Display server upgrade
+    # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
     (Get-SPProduct).Servers | Select Servername, InstallStatus | Sort Servername | ft -a
 	
-	$halt = (Get-SPProduct).Servers |? {$_.InstallStatus -eq "InstallRequired"}
-	if ($halt) {
-		$halt | ft -a
-		Write-Host "HALT - MEDIA ERROR - Install on servers" -Fore Red
-		Exit
-	}
+    $halt = (Get-SPProduct).Servers |? {$_.InstallStatus -eq "InstallRequired"}
+    if ($halt) {
+        $halt | ft -a
+        Write-Host "HALT - MEDIA ERROR - Install on servers" -Fore Red
+        Exit
+    }
 }
 
 Function SafetyEXE() {
@@ -170,7 +174,7 @@ Function RunEXE() {
     foreach ($f in $files) {
         $name = $f.Name
         $patchName = $name.replace(".exe", "")
-		# PACKAGE.BYPASS.DETECTION.CHECK=1
+        # PACKAGE.BYPASS.DETECTION.CHECK=1
         $cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
         if ($ver -eq 16) {
             $cmd = $cmd.replace("forcerestart", "norestart")
@@ -968,14 +972,14 @@ Function StartServiceInst() {
                 if ($si.Status -ne "Online") {
                     $row | ft -a
                     Write-Host "Starting ... " -Fore Green
-					if ($si.TypeName -ne "User Profile Synchronization Service") {
+                    if ($si.TypeName -ne "User Profile Synchronization Service") {
                         # UPS needs password input to start via Central Admin GUI
-						$si.Provision()
-					}
+                        $si.Provision()
+                    }
                     if ($si.TypeName -eq "Distributed Cache") {
                         # Special command to initialize
                         Add-SPDistributedCacheServiceInstance
-						$si.Provision()
+                        $si.Provision()
                     }
                     Write-Host "OK"
                 }
@@ -1102,7 +1106,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.56 last modified 03-17-2017"
+    "SPPatchify version 0.57 last modified 03-21-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1139,12 +1143,15 @@ function Main() {
             RunEXE
             WaitReboot
             ProductLocal
-            LocalReboot
+            if (!$phaseOneBinary) {
+                # Reboot and queue Phase two
+                LocalReboot
+            }
         }
     }
     else {
         # Phase two (switch -P) SP Config Wizard
-		SafetyInstallRequired
+        SafetyInstallRequired
         DetectAdmin
         ReadIISPW
         if (!$onlineContent) {
