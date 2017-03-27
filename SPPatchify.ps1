@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.57
-	Last Modified	: 03-21-2017
+	Version			: 0.60
+	Last Modified	: 03-24-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -52,22 +52,22 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.57"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.60"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
+
+# Remote UNC
+$char = $root.ToCharArray()
+if ($char[1] -eq ':') {
+	$char[1] = '$'
+}
+$remoteRoot = -join $char
 
 #region binary EXE
 Function CopyEXE($action) {
     Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
 	
-    # Remote UNC
-    $char = $root.ToCharArray()
-    if ($char[1] -eq ':') {
-        $char[1] = '$'
-    }
-    $remoteRoot = -join $char
-
     # Clear old session
     Get-Job | Remove-Job
     Get-PSSession | Remove-PSSession
@@ -166,7 +166,10 @@ Function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
 	
     # Remove MSPLOG
-    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:$false -ErrorAction SilentlyContinue"
+    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
+	
+	# Remove MSPLOG
+    LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
 	
     # Build CMD
     $ver = (Get-SPFarm).BuildVersion.Major
@@ -222,7 +225,7 @@ Function WaitEXE($patchName) {
             $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
             $sb = [Scriptblock]::Create($cmd)
             $msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-            $msp = $msp | select Server, Count, LastWriteTime | sort LastWriteTime, Server -desc
+            $msp = $msp | select Server, @{n="MSPCount";e={$_.Count}}, LastWriteTime | sort LastWriteTime, Server -desc
 			
             # HTML view
             $coll = newStatus("RunEXE")
@@ -421,7 +424,7 @@ Function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("IISAdmin", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -437,7 +440,7 @@ Function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("IISAdmin", "SPTimerV4", "SQLBrowser", "Schedule") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
@@ -1063,7 +1066,7 @@ function displayStatus($coll, $px, $msg, $msp) {
     $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
     $html = $html.replace("<td>2</td>", "<td style='background-color:lightgreen'>Complete</td>")
-    $html | Out-File $file -Force -Confirm:$false
+    $html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
 
     launchIE $file
 }
@@ -1106,7 +1109,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.57 last modified 03-21-2017"
+    "SPPatchify version 0.60 last modified 03-24-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1137,6 +1140,8 @@ function Main() {
             CopyEXE "Copy"
             SafetyEXE
             SaveServiceInst
+			ChangeServices $true
+			ProductLocal
             ChangeDC
             ChangeServices $false
             IISStart
