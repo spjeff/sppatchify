@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.60
-	Last Modified	: 03-24-2017
+	Version			: 0.61
+	Last Modified	: 05-23-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -52,7 +52,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.60"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.61"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -879,13 +879,14 @@ Function PatchMenu() {
     $ver = "15"
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
         $ver = (Get-SPFarm).BuildVersion.Major
-    }
-    $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
-    if ($sppl) {
-        if ($ver -ne 16) {
-            $sku = "PROJ"
+        $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+        if ($sppl) {
+            if ($ver -ne 16) {
+                $sku = "PROJ"
+            }
         }
     }
+
     $prod = "$sku$ver"
     Write-Host "Product = $prod"
     ShowMenu $prod
@@ -1109,7 +1110,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.60 last modified 03-24-2017"
+    "SPPatchify version 0.61 last modified 05-23-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
