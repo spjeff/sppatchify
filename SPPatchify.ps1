@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.61
-	Last Modified	: 05-23-2017
+	Version			: 0.62
+	Last Modified	: 05-25-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -365,7 +365,9 @@ Function LoopRemoteCmd($msg, $cmd) {
         # Invoke
         foreach ($s in $sb) {
             Write-Host $s.ToString()
-            Invoke-Command -Session $remote -ScriptBlock $s
+            if ($remote) {
+                Invoke-Command -Session $remote -ScriptBlock $s
+            }
         }
         Write-Host "<< complete on $addr" -Fore "Green"
 		
