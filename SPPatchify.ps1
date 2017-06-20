@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.63
+	Version			: 0.64
 	Last Modified	: 06-20-2017
 .LINK
 	Source Code
@@ -45,14 +45,17 @@ param (
 	
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
-    [switch]$onlineContent
+    [switch]$onlineContent,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -bypass to run EXE with Skip Product Detection.')]
+    [switch]$bypass
 )
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.63"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.64"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -177,8 +180,13 @@ Function RunEXE() {
     foreach ($f in $files) {
         $name = $f.Name
         $patchName = $name.replace(".exe", "")
-        # PACKAGE.BYPASS.DETECTION.CHECK=1
-        $cmd = "Start-Process '$root\media\$name' -ArgumentList '/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
+        # Optional bypass to force EXE install (skip detection)
+        if ($bypass) {
+            $bypassCmd = ""
+        } else {
+            $bypassCmd = "PACKAGE.BYPASS.DETECTION.CHECK=1 "
+        }
+        $cmd = "Start-Process '$root\media\$name' -ArgumentList '$bypassCmd/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
         if ($ver -eq 16) {
             $cmd = $cmd.replace("forcerestart", "norestart")
         }
@@ -1112,7 +1120,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.63 last modified 06-20-2017"
+    "SPPatchify version 0.64 last modified 06-20-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
