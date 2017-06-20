@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.62
-	Last Modified	: 05-25-2017
+	Version			: 0.63
+	Last Modified	: 06-20-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,27 +23,27 @@
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
     [Alias("d")]
     [switch]$downloadMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
     [Alias("c")]
     [switch]$copyMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
     [Alias("v")]
     [switch]$showVersion,	
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b to execute Phase One only (run binary)')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
     [Alias("b")]
     [switch]$phaseOneBinary,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p to execute Phase Two after local reboot.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
     [Alias("p")]
     [switch]$phaseTwo,
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
     [switch]$onlineContent
 )
@@ -52,7 +52,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.61"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.63"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -488,9 +488,9 @@ Function RunConfigWizard() {
     }
     LoopRemoteCmd "Save B2B shortcut on " @($shared, $b2b)
 	
-    # Run Config Wizard
+    # Run Config Wizard - https://blogs.technet.microsoft.com/stefan_gossner/2015/08/20/why-i-prefer-psconfigui-exe-over-psconfig-exe/
     $wiz = {
-        & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources"
+        & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources" -cmd "services" -install
     }
     LoopRemoteCmd "Run Config Wizard on " @($shared, $wiz)
 }
@@ -1112,7 +1112,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.61 last modified 05-23-2017"
+    "SPPatchify version 0.63 last modified 06-20-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1136,7 +1136,7 @@ function Main() {
             CopyEXE "Copy"
         }
         else {
-            # Phase One - patch EXE
+            # Phase One (switch -B) binary EXE
             PatchMenu
             EnablePSRemoting
             ReadIISPW
@@ -1158,7 +1158,7 @@ function Main() {
         }
     }
     else {
-        # Phase two (switch -P) SP Config Wizard
+        # Phase Two (switch -P) SP Config Wizard
         SafetyInstallRequired
         DetectAdmin
         ReadIISPW
