@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.64
-	Last Modified	: 06-20-2017
+	Version			: 0.66
+	Last Modified	: 06-30-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -1099,6 +1099,25 @@ function launchIE($file) {
 }
 #endregion
 
+function PreflightCheck() {
+    try {
+        Write-Host "Starting preflight check " -Fore Green
+        # Start Jobs
+        foreach ($server in $global:servers) {
+            $addr = $server.Address
+            if ($addr -ne $env:computername) {
+                $s = New-PSSession -ComputerName $env:computername -Credential $global:cred -Authentication CredSSP
+            }
+        }
+        Write-Host "Starting preflight check succeeded" -Fore Green
+        return $true
+
+    }
+    catch {
+        throw 'Not able to connect to one or more computers in the farm. Please make sure you have run run Enable-PSRemoting and Enable-WSManCredSSP -Role Server'
+    }
+}
+
 function Main() {
     # Download media
     if ($downloadMediaOnly) {
@@ -1120,7 +1139,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.64 last modified 06-20-2017"
+    "SPPatchify version 0.66 last modified 06-30-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1133,21 +1152,22 @@ function Main() {
 
     # Local farm servers
     $global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
-    ReadIISPW
+    ReadIISPW    
+    if (-not (PreflightCheck)) {
+        return
+    }    
     LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
 
     # Core steps
     if (!$phaseTwo) {
         if ($copyMediaOnly) {
-            # Copy media only (switch -C)
-            ReadIISPW
+            # Copy media only (switch -C)            
             CopyEXE "Copy"
         }
         else {
             # Phase One (switch -B) binary EXE
             PatchMenu
-            EnablePSRemoting
-            ReadIISPW
+            EnablePSRemoting            
             CopyEXE "Copy"
             SafetyEXE
             SaveServiceInst
@@ -1168,8 +1188,7 @@ function Main() {
     else {
         # Phase Two (switch -P) SP Config Wizard
         SafetyInstallRequired
-        DetectAdmin
-        ReadIISPW
+        DetectAdmin        
         if (!$onlineContent) {
             ChangeContent $false
         }
