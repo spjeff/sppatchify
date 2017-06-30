@@ -22,6 +22,10 @@ SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console.
 * Start SharePoint services
 * Display Central Admin
 
+## Getting Started
+
+* [How to install SharePoint patches on a multi-server farm in just three steps](http://rolandoldengarm.com/index.php/2017/06/30/how-to-install-sharepoint-patches-on-a-multi-server-farm-in-just-three-steps/)
+
 ## Screenshots
 ![image](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/6.png)
 ![image](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/5.png)
