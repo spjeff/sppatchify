@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.66
-	Last Modified	: 06-30-2017
+	Version			: 0.67
+	Last Modified	: 07-05-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -55,7 +55,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.64"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.67"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -897,9 +897,43 @@ Function PatchMenu() {
         }
     }
 
+    # Product and menu
     $prod = "$sku$ver"
     Write-Host "Product = $prod"
     ShowMenu $prod
+	
+    # Filter CSV for selected CU month
+    Write-Host "SELECTED = $($global:selmonth)" -Fore "Yellow"
+    $year = $global:selmonth.Split(" ")[1]
+    $month = GetMonthInt $global:selmonth.Split(" ")[0]
+    $patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
+    $patchFiles | Format-Table -Auto
+	
+    # Download patch files
+    $bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
+    foreach ($file in $patchFiles) {
+        # Parameters
+        $splits = $file.URL.Split("/")
+        $name = $splits[$splits.Count - 1]
+        $dest = "$root\media\$name"
+
+        # Download file if missing
+        if (Test-Path $dest) {
+            Write-Host "Found $name"
+        } else {
+            Write-Host "Downloading $name"
+            if ($bits) {
+                # pefer BITS
+                Write-Host "BITS $dest"
+                Start-BitsTransfer -Source $file.URL -Destination $dest
+            }
+            else {
+                # Dot Net
+                Write-Host "WebClient $dest"
+                (New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
+            }
+        }
+    }
 
     # Halt if Farm is PROJ and media is not
     $files = Get-ChildItem "$root\media\*prj*.exe"
@@ -917,39 +951,6 @@ Function PatchMenu() {
         Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
         Stop-Transcript
         Exit
-    }
-	
-    # Filter CSV for selected CU month
-    Write-Host "SELECTED = $($global:selmonth)" -Fore "Yellow"
-    $year = $global:selmonth.Split(" ")[1]
-    $month = GetMonthInt $global:selmonth.Split(" ")[0]
-    $patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
-    $patchFiles | Format-Table -Auto
-	
-    # Download patch files
-    $bits = (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue)
-    foreach ($file in $patchFiles) {
-        # Parameters
-        $splits = $file.URL.Split("/")
-        $name = $splits[$splits.Count - 1]
-        $dest = "$root\media\$name"
-
-        if (Test-Path $dest) {
-            Write-Host "Found $name"
-        }
-        else {
-            Write-Host "Downloading $name"
-            if ($bits) {
-                # pefer BITS
-                Write-Host "BITS $dest"
-                Start-BitsTransfer -Source $file.URL -Destination $dest
-            }
-            else {
-                # Dot Net
-                Write-Host "WebClient $dest"
-                (New-Object System.Net.WebClient).DownloadFile($file.URL, $dest)
-            }
-        }
     }
 }
 
@@ -1139,7 +1140,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.66 last modified 06-30-2017"
+    "SPPatchify version 0.67 last modified 07-05-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
