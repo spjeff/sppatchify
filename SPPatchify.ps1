@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.67
-	Last Modified	: 07-05-2017
+	Version			: 0.68
+	Last Modified	: 08-16-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -55,7 +55,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.67"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.68"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -186,7 +186,7 @@ Function RunEXE() {
         } else {
             $bypassCmd = "PACKAGE.BYPASS.DETECTION.CHECK=1 "
         }
-        $cmd = "Start-Process '$root\media\$name' -ArgumentList '$bypassCmd/quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
+        $cmd = "Start-Process '$root\media\$name' -ArgumentList '$bypassCmd/passive /quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
         if ($ver -eq 16) {
             $cmd = $cmd.replace("forcerestart", "norestart")
         }
@@ -1140,7 +1140,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.67 last modified 07-05-2017"
+    "SPPatchify version 0.68 last modified 08-16-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
