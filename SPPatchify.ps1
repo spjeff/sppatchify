@@ -48,13 +48,13 @@ param (
     [switch]$onlineContent,
 	
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportTo with email TO address.')]
-    [switch]$emailReportTo,
+    [string]$emailReportTo,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportFrom with email FROM address.')]
-    [switch]$emailReportFrom,
+    [string]$emailReportFrom,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportServer with email SMTP relay server.')]
-    [switch]$emailReportServer
+    [string]$emailReportServer
 )
 
 # Plugin
