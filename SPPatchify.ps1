@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.70
-	Last Modified	: 09-21-2017
+	Version			: 0.71
+	Last Modified	: 10-25-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -23,36 +23,45 @@
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
     [Alias("d")]
     [switch]$downloadMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
     [Alias("c")]
     [switch]$copyMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
     [Alias("v")]
     [switch]$showVersion,	
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
     [Alias("b")]
     [switch]$phaseOneBinary,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
     [Alias("p")]
     [switch]$phaseTwo,
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
-    [switch]$onlineContent
+    [switch]$onlineContent,
+	
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportTo with email TO address.')]
+    [switch]$emailReportTo,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportFrom with email FROM address.')]
+    [switch]$emailReportFrom,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportServer with email SMTP relay server.')]
+    [switch]$emailReportServer
 )
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.70"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.71"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -282,6 +291,7 @@ Function LocalReboot() {
     $th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
     Write-Host "Duration Total Hours: $th" -Fore "Yellow"
     Stop-Transcript
+    Email-Transcript
     Start-Sleep 5
     Restart-Computer -Force
     Exit
@@ -931,6 +941,7 @@ Function PatchMenu() {
     if ($sku -eq "PROJ" -and !$files) {
         Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
         Stop-Transcript
+        Email-Transcript
         Exit
     }
 	
@@ -941,6 +952,7 @@ Function PatchMenu() {
         $files | Format-Table -AutoSize
         Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
         Stop-Transcript
+        Email-Transcript
         Exit
     }
 }
@@ -1110,6 +1122,23 @@ function PreflightCheck() {
     }
 }
 
+function Email-Transcript ($logPath) {
+    # Email transcrit LOG file
+    if ($emailReportServer -and $emailReportTo -and $emailReportFrom) {
+        $msg = New-Object System.Net.Mail.Mailmsg 
+        $msg.From = $emailReportFrom
+        $msg.To.Add($emailReportTo) 
+        $pc = $env:COMPUTERNAME
+        $msg.Subject = "SPPatchify - $pc" 
+        $msg.Body = Get-Content $logPath
+
+        $smtp = New-Object System.Net.Mail.SmtpClient 
+        $smtp.Host = $emailReportServer
+        $smtp.UseDefaultCredentials = $true 
+        $smtp.Send($msg) 
+    }
+}
+
 function Main() {
     # Download media
     if ($downloadMediaOnly) {
@@ -1131,7 +1160,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.70 last modified 09-21-2017"
+    "SPPatchify version 0.71 last modified 10-25-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1225,6 +1254,7 @@ function Main() {
     # Cleanup
     Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
     Stop-Transcript
+    Email-Transcript
 }
 
 Main
