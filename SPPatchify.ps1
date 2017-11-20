@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.71
-	Last Modified	: 10-25-2017
+	Version			: 0.72
+	Last Modified	: 11-17-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.71"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.72"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -186,8 +186,8 @@ Function RunEXE() {
     foreach ($f in $files) {
         $name = $f.Name
         $patchName = $name.replace(".exe", "")
-        $cmd = "Start-Process '$root\media\$name' -ArgumentList '/passive /quiet /forcerestart /log:""$root\log\$name.log""' -PassThru"
-        if ($ver -eq 16) {
+        $cmd = "Start-Process '$root\media\$name' -ArgumentList '/passive /forcerestart /log:""$root\log\$name.log""' -PassThru"
+        if ($ver -eq 16 -or $env:computername -eq $server.Address) {
             $cmd = $cmd.replace("forcerestart", "norestart")
         }
         LoopRemoteCmd "Run EXE on " $cmd
@@ -339,13 +339,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 
         # Script block
         if ($cmd.GetType().Name -eq "String") {
-            if ($env:computername -eq $server.Address) {
-                $runCmd = $cmd -replace "forcerestart", "norestart"
-            }
-            else {
-                $runCmd = $cmd
-            }
-            $sb = [ScriptBlock]::Create($runCmd)
+            $sb = [ScriptBlock]::Create($cmd)
         }
         else {
             $sb = $cmd
@@ -1160,7 +1154,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.71 last modified 10-25-2017"
+    "SPPatchify version 0.72 last modified 11-17-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
