@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.72
-	Last Modified	: 11-17-2017
+	Version			: 0.73
+	Last Modified	: 11-28-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.72"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.73"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -525,8 +525,9 @@ Function ChangeContent($state) {
             $prct = [Math]::Round(($counter / $dbs.Count) * 100)
             Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
             $counter++
-		
-            Mount-SPContentDatabase -WebApplication $_.WebApp -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+        
+            $wa = Get-SPWebApplication $_.WebApp
+            Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
         }
     }
 }
@@ -1154,7 +1155,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.72 last modified 11-17-2017"
+    "SPPatchify version 0.73 last modified 11-28-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
