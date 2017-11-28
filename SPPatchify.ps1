@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.73
+	Version			: 0.74
 	Last Modified	: 11-28-2017
 .LINK
 	Source Code
@@ -23,37 +23,37 @@
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
     [Alias("d")]
     [switch]$downloadMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
     [Alias("c")]
     [switch]$copyMediaOnly,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
     [Alias("v")]
     [switch]$showVersion,	
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
     [Alias("b")]
     [switch]$phaseOneBinary,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
     [Alias("p")]
     [switch]$phaseTwo,
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
     [switch]$onlineContent,
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportTo with email TO address.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportTo with email TO address.')]
     [string]$emailReportTo,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportFrom with email FROM address.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportFrom with email FROM address.')]
     [string]$emailReportFrom,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, Helpmsg = 'Use -emailReportServer with email SMTP relay server.')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportServer with email SMTP relay server.')]
     [string]$emailReportServer
 )
 
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.73"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.74"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
