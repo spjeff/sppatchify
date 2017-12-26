@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.75
-	Last Modified	: 12-25-2017
+	Version			: 0.76
+	Last Modified	: 12-26-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.75"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.76"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -282,8 +282,8 @@ Function LocalReboot() {
     # Product install status
 	
     # Create Regkey
-    New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name RunOnce -ErrorAction SilentlyContinue | Out-Null
-    New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name SPPatchify -Value "PowerShell $root\SPPatchify.ps1 -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
+    New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name "RunOnce" -ErrorAction SilentlyContinue | Out-Null
+    New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "SPPatchify" -Value "PowerShell -executionpolicy unrestricted -file ""$root\SPPatchify.ps1 -PhaseTwo""" -ErrorAction SilentlyContinue | Out-Null
 	
     # Reboot
     Write-Host "`n ===== REBOOT LOCAL ===== $(Get-Date)"
@@ -1159,7 +1159,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.75 last modified 12-25-2017"
+    "SPPatchify version 0.76 last modified 12-26-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
