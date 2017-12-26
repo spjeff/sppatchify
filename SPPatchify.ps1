@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.74
-	Last Modified	: 11-28-2017
+	Version			: 0.75
+	Last Modified	: 12-25-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.74"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.75"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -221,8 +221,7 @@ Function WaitEXE($patchName) {
         $counter++
 		
         # Remote Posh
-        $when = Get-Date
-        Write-Host "`nEXE monitor started on $addr at $when " -NoNewLine
+        Write-Host "`nEXE monitor started on $addr at $(Get-Date) " -NoNewLine
         do {
             # Monitor EXE process
             $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
@@ -514,7 +513,12 @@ Function ChangeContent($state) {
     }
     else {
         # Add content
-        $dbs = Import-Csv "$root\log\contentdbs-$when.csv"
+		$files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort LastAccessTime -Desc
+		if ($files -is [Array]) {
+			$files = $files[0]
+		}
+        $dbs = Import-Csv $files.Name
+		
         # Loop databases
         $counter = 0
         $dbs | % {
@@ -526,7 +530,7 @@ Function ChangeContent($state) {
             Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
             $counter++
         
-            $wa = Get-SPWebApplication $_.WebApp
+            $wa = Get-SPWebApplication |? {$_.Url -eq $_.WebApp}
             Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
         }
     }
@@ -1155,7 +1159,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.73 last modified 11-28-2017"
+    "SPPatchify version 0.75 last modified 12-25-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1222,27 +1226,26 @@ function Main() {
 	
     # Run duration
     Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
-    $th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
-    Write-Host "Duration Hours: $th" -Fore "Yellow"
+    $totalHours = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
+    Write-Host "Duration Hours: $totalHours" -Fore "Yellow"
     $c = (Get-SPContentDatabase).Count
     Write-Host "Content Databases Online: $c"
 	
     # Add both Phase one and two
     $regHive = "HKCU:\Software"
     $regKey = "SPPatchify"
-    $regName = "PhaseOneTotalHours"
     if (!$phaseTwo) {
         # Create Regkey
         New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
-        New-ItemProperty -Path "$regHive\$regKey" -Name "$regName" -Value $th -ErrorAction SilentlyContinue | Out-Null
+        New-ItemProperty -Path "$regHive\$regKey" -Name "PhaseOneTotalHours" -Value $totalHours -ErrorAction SilentlyContinue | Out-Null
     }
     else {
-        $thKey = Get-ItemProperty -Path "$regHive\$regKey" -ErrorAction SilentlyContinue
-        if ($thKey) {
-            $h = [double]($thKey."$regName")
-            $h += $th
+		# Read Regkey
+        $key = Get-ItemProperty -Path "$regHive\PhaseOneTotalHours" -ErrorAction SilentlyContinue
+        if ($key) {
+            $totalHours += [double]($key."PhaseOneTotalHours")
         }
-        Write-Host "TOTAL Hours (Phase One and Two): $h" -Fore "Yellow"
+        Write-Host "TOTAL Hours (Phase One and Two): $totalHours" -Fore "Yellow"
         Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
     }
 	
