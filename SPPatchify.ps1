@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.76
-	Last Modified	: 12-26-2017
+	Version			: 0.77
+	Last Modified	: 12-31-2017
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.76"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.77"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -888,11 +888,21 @@ Function PatchMenu() {
     $sku = "SP"
     $ver = "15"
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
-        $ver = (Get-SPFarm).BuildVersion.Major
-        $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
-        if ($sppl) {
-            if ($ver -ne 16) {
-                $sku = "PROJ"
+        # Local farm
+        $farm = Get-SPFarm
+        if ($farm) {
+            $ver = $farm.BuildVersion.Major
+            $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+            if ($sppl) {
+                if ($ver -ne 16) {
+                    $sku = "PROJ"
+                }
+            }
+        } else {
+            # Detect binary folder - fallback if not joined to farm
+            $detect16 = Get-ChildItem "C:\Program Files\Common Files\microsoft shared\Web Server Extensions\16"
+            if ($detect16) {
+                $ver = "16"
             }
         }
     }
@@ -1159,7 +1169,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.76 last modified 12-26-2017"
+    "SPPatchify version 0.77 last modified 12-31-2017"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
