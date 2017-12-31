@@ -889,7 +889,7 @@ Function PatchMenu() {
     $ver = "15"
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
         # Local farm
-        $farm = Get-SPFarm
+        $farm = Get-SPFarm -ErrorAction SilentlyContinue
         if ($farm) {
             $ver = $farm.BuildVersion.Major
             $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
