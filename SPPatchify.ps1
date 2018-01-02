@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.77
-	Last Modified	: 12-31-2017
+	Version			: 0.78
+	Last Modified	: 01-02-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.77"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.78"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1134,7 +1134,7 @@ function PreflightCheck() {
 function Email-Transcript ($logPath) {
     # Email transcrit LOG file
     if ($emailReportServer -and $emailReportTo -and $emailReportFrom) {
-        $msg = New-Object System.Net.Mail.Mailmsg 
+        $msg = New-Object System.Net.Mail.MailMessage
         $msg.From = $emailReportFrom
         $msg.To.Add($emailReportTo) 
         $pc = $env:COMPUTERNAME
@@ -1169,7 +1169,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.77 last modified 12-31-2017"
+    "SPPatchify version 0.78 last modified 01-02-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
