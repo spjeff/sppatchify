@@ -1090,7 +1090,9 @@ function displayStatus($coll, $px, $msg, $msp) {
     $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
     $html = $html.replace("<td>2</td>", "<td style='background-color:lightgreen'>Complete</td>")
-    $html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
+	try {
+		$html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
+	} catch {}
 
     launchIE $file
 }
