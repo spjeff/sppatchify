@@ -517,9 +517,9 @@ Function ChangeContent($state) {
 		if ($files -is [Array]) {
 			$files = $files[0]
 		}
-        $dbs = Import-Csv $files.Name
 		
         # Loop databases
+        $dbs = Import-Csv $files.Fullname
         $counter = 0
         $dbs | % {
             $name = $_.Name
