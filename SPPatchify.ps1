@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.79
-	Last Modified	: 01-15-2018
+	Version			: 0.80
+	Last Modified	: 01-19-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -61,7 +61,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.79"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.80"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -892,7 +892,7 @@ Function PatchMenu() {
         $farm = Get-SPFarm -ErrorAction SilentlyContinue
         if ($farm) {
             $ver = $farm.BuildVersion.Major
-            $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+            $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Microsoft Project Server*"}
             if ($sppl) {
                 if ($ver -ne 16) {
                     $sku = "PROJ"
@@ -1171,7 +1171,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.79 last modified 01-15-2018"
+    "SPPatchify version 0.80 last modified 01-19-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
