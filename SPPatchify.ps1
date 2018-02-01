@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.81
+	Version			: 0.82
 	Last Modified	: 02-01-2018
 .LINK
 	Source Code
@@ -62,7 +62,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.81"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.82"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -424,6 +424,7 @@ Function ChangeDC() {
 
 Function ChangeServices($state) {
     Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore "Yellow"
+    $ver = (Get-SPFarm).BuildVersion.Major
 	
     # Logic core
     if ($state) {
@@ -435,7 +436,7 @@ Function ChangeServices($state) {
                     Start-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch15", "SPSearchHostController") | % {
+            @("OSearch$ver", "SPSearchHostController") | % {
                 Start-Service $_ -ErrorAction SilentlyContinue
             }
             Start-Process 'iisreset.exe' -ArgumentList '/start' -Wait -PassThru -NoNewWindow | Out-Null
@@ -451,7 +452,7 @@ Function ChangeServices($state) {
                     Stop-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch15", "SPSearchHostController") | % {
+            @("OSearch$ver", "SPSearchHostController") | % {
                 Stop-Service $_ -ErrorAction SilentlyContinue
             }
         }
@@ -1175,7 +1176,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.81 last modified 02-01-2018"
+    "SPPatchify version 0.82 last modified 02-01-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
