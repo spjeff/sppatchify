@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.80
-	Last Modified	: 01-19-2018
+	Version			: 0.81
+	Last Modified	: 02-01-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -26,6 +26,7 @@ param (
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -d -downloadMediaOnly to execute Media Download only.  No farm changes.  Prep step for real patching later.')]
     [Alias("d")]
     [switch]$downloadMediaOnly,
+    [string]$downloadVersion,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -c -copyMediaOnly to copy \media\ across all peer machines.  No farm changes.  Prep step for real patching later.')]
     [Alias("c")]
@@ -61,7 +62,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.80"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.81"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -887,6 +888,9 @@ Function PatchMenu() {
     # SKU - SharePoint or Project?
     $sku = "SP"
     $ver = "15"
+    if ($downloadVersion) {
+        $ver = $downloadVersion
+    }
     if (Get-Command Get-SPFarm -ErrorAction SilentlyContinue) {
         # Local farm
         $farm = Get-SPFarm -ErrorAction SilentlyContinue
@@ -1171,7 +1175,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.80 last modified 01-19-2018"
+    "SPPatchify version 0.81 last modified 02-01-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
