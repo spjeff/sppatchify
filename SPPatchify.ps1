@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.82
-	Last Modified	: 02-01-2018
+	Version			: 0.83
+	Last Modified	: 02-04-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -62,7 +62,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.82"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.83"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -70,7 +70,7 @@ $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz"
 # Remote UNC
 $char = $root.ToCharArray()
 if ($char[1] -eq ':') {
-	$char[1] = '$'
+    $char[1] = '$'
 }
 $remoteRoot = -join $char
 
@@ -178,7 +178,7 @@ Function RunEXE() {
     # Remove MSPLOG
     LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
 	
-	# Remove MSPLOG
+    # Remove MSPLOG
     LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
 	
     # Build CMD
@@ -214,33 +214,35 @@ Function WaitEXE($patchName) {
 
     # Verify machines online
     $counter = 0
-    foreach ($server in $global:servers) {	
-        # Progress
-        $addr = $server.Address
-        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
-        Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
-        $counter++
-		
-        # Remote Posh
-        Write-Host "`nEXE monitor started on $addr at $(Get-Date) " -NoNewLine
-        do {
-            # Monitor EXE process
-            $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
-            Write-Host "." -NoNewLine
-            Start-Sleep 5
-			
-            # Count MSPLOG files
-            $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
-            $sb = [Scriptblock]::Create($cmd)
-            $msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-            $msp = $msp | select Server, @{n="MSPCount";e={$_.Count}}, LastWriteTime | sort LastWriteTime, Server -desc
-			
-            # HTML view
-            $coll = newStatus("RunEXE")
-            ($coll |? {$_.Server -eq $addr}).RunEXE = 1
-            displayStatus $coll $false $false $msp
+    if ($global:servers) {
+        foreach ($server in $global:servers) {	
+            # Progress
+            $addr = $server.Address
+            $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
+            Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+            $counter++
+            
+            # Remote Posh
+            Write-Host "`nEXE monitor started on $addr at $(Get-Date) " -NoNewLine
+            do {
+                # Monitor EXE process
+                $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
+                Write-Host "." -NoNewLine
+                Start-Sleep 5
+                
+                # Count MSPLOG files
+                $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
+                $sb = [Scriptblock]::Create($cmd)
+                $msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
+                $msp = $msp | select Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | sort LastWriteTime, Server -desc
+                
+                # HTML view
+                $coll = newStatus("RunEXE")
+                ($coll |? {$_.Server -eq $addr}).RunEXE = 1
+                displayStatus $coll $false $false $msp
+            }
+            while ($proc)
         }
-        while ($proc)
     }
 }
 
@@ -515,25 +517,27 @@ Function ChangeContent($state) {
     }
     else {
         # Add content
-		$files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort LastAccessTime -Desc
-		if ($files -is [Array]) {
-			$files = $files[0]
-		}
+        $files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort LastAccessTime -Desc
+        if ($files -is [Array]) {
+            $files = $files[0]
+        }
 		
         # Loop databases
         $dbs = Import-Csv $files.Fullname
         $counter = 0
-        $dbs | % {
-            $name = $_.Name
-            $name
-			
-            # Progress
-            $prct = [Math]::Round(($counter / $dbs.Count) * 100)
-            Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
-            $counter++
-        
-            $wa = Get-SPWebApplication $_.WebApp
-            Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+        if ($dbs) {
+            $dbs | % {
+                $name = $_.Name
+                $name
+                
+                # Progress
+                $prct = [Math]::Round(($counter / $dbs.Count) * 100)
+                Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                $counter++
+            
+                $wa = Get-SPWebApplication $_.WebApp
+                Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+            }
         }
     }
 }
@@ -772,12 +776,11 @@ Function UpgradeContent() {
 				
                 # Progress
                 $counter = ($track |? {$_.Status -eq "Completed"}).Count
-                try {
-                    $prct = 0
+                $prct = 0
+                if ($track) {
                     $prct = [Math]::Round(($counter / $track.Count) * 100)
                 }
-                catch {
-                }
+          
                 Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
                 $track | Format-Table -AutoSize
 				
@@ -903,7 +906,8 @@ Function PatchMenu() {
                     $sku = "PROJ"
                 }
             }
-        } else {
+        }
+        else {
             # Detect binary folder - fallback if not joined to farm
             $detect16 = Get-ChildItem "C:\Program Files\Common Files\microsoft shared\Web Server Extensions\16"
             if ($detect16) {
@@ -935,7 +939,8 @@ Function PatchMenu() {
         # Download file if missing
         if (Test-Path $dest) {
             Write-Host "Found $name"
-        } else {
+        }
+        else {
             Write-Host "Downloading $name"
             if ($bits) {
                 # pefer BITS
@@ -1095,9 +1100,10 @@ function displayStatus($coll, $px, $msg, $msp) {
     $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
     $html = $html.replace("<td>2</td>", "<td style='background-color:lightgreen'>Complete</td>")
-	try {
-		$html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
-	} catch {}
+    try {
+        $html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    catch {}
 
     launchIE $file
 }
@@ -1176,7 +1182,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.82 last modified 02-01-2018"
+    "SPPatchify version 0.83 last modified 02-04-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1208,8 +1214,8 @@ function Main() {
             CopyEXE "Copy"
             SafetyEXE
             SaveServiceInst
-			ChangeServices $true
-			ProductLocal
+            ChangeServices $true
+            ProductLocal
             ChangeDC
             ChangeServices $false
             IISStart
@@ -1257,7 +1263,7 @@ function Main() {
         New-ItemProperty -Path "$regHive\$regKey" -Name "PhaseOneTotalHours" -Value $totalHours -ErrorAction SilentlyContinue | Out-Null
     }
     else {
-		# Read Regkey
+        # Read Regkey
         $key = Get-ItemProperty -Path "$regHive\PhaseOneTotalHours" -ErrorAction SilentlyContinue
         if ($key) {
             $totalHours += [double]($key."PhaseOneTotalHours")
