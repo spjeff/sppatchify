@@ -1,7 +1,7 @@
 ## Description
 SharePoint Patchify - Apply CU patch to entire farm from one PowerShell console. SWEET!!
 
-[![](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/download.png)](https://github.com/spjeff/sppatchify/files/1693036/SPPatchify.zip)
+[![](https://raw.githubusercontent.com/spjeff/sppatchify/master/doc/download.png)](https://github.com/spjeff/sppatchify/releases/download/v0.83/SPPatchify.zip)
 
 ## NOTE
 * May need to run `Enable-PSRemoting` and `Enable-WSManCredSSP -Role Server ` on all farm servers to allow PowerShell remoting before running this script.
