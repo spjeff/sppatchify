@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.84
-	Last Modified	: 03-03-2018
+	Version			: 0.85
+	Last Modified	: 03-10-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -62,7 +62,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.84"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.85"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -767,6 +767,9 @@ Function UpgradeContent() {
                     Write-Host $pc -Fore "Green"
                     Get-PSSession | Format-Table -AutoSize
                     $session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
+                    if (!$session) {
+                        $session = New-PSSession -ComputerName $pc -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
+                    }
                     $result = Invoke-Command $remoteCmd -Session $session -AsJob
 					
                     # Update DB tracking
@@ -1182,7 +1185,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.84 last modified 03-03-2018"
+    "SPPatchify version 0.85 last modified 03-10-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
