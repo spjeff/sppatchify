@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.85
-	Last Modified	: 03-10-2018
+	Version			: 0.86
+	Last Modified	: 03-27-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -36,12 +36,10 @@ param (
     [Alias("v")]
     [switch]$showVersion,	
 	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -b -phaseOneBinary to execute Phase One only (run binary)')]
-    [Alias("b")]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseOneBinary to execute Phase One only (run binary)')]
     [switch]$phaseOneBinary,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -p -phaseTwo to execute Phase Two after local reboot.')]
-    [Alias("p")]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseTwo to execute Phase Two after local reboot.')]
     [switch]$phaseTwo,
 	
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
@@ -51,18 +49,21 @@ param (
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportTo with email TO address.')]
     [string]$emailReportTo,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportFrom with email FROM address.')]
-    [string]$emailReportFrom,
-
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportServer with email SMTP relay server.')]
-    [string]$emailReportServer
+    [string]$emailReportServer,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -remoteSessionPort to open PSSession (remoting) with custom port number.')]
+    [string]$remoteSessionPort,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -remoteSessionSSL to open PSSession (remoting) with SSL encryption.')]
+    [switch]$remoteSessionSSL
 )
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.85"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.86"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -86,7 +87,15 @@ Function CopyEXE($action) {
     foreach ($server in $global:servers) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
-            $s = New-PSSession -ComputerName $env:computername -Credential $global:cred -Authentication CredSSP
+
+            # Dynamic open PSSesion
+            $cmd = "`$s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
+            if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+            if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+            $sb = [Scriptblock]::Create($cmd)
+            Invoke-Command -ScriptBlock $sb
+
+            # Dynamic remote command
             $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0"
             Write-Host $cmd -Fore Yellow
             $sb = [Scriptblock]::Create($cmd)
@@ -267,10 +276,15 @@ Function WaitReboot() {
 		
         # Remote PowerShell session
         do {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
-            if (!$remote) {
-                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
-            }
+
+            # Dynamic open PSSession
+            $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+            if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+            if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+            $sb = [Scriptblock]::Create($cmd)
+            Invoke-Command -ScriptBlock $sb
+
+            # Display
             Write-Host "."  -NoNewLine
             Start-Sleep 5
         }
@@ -361,13 +375,16 @@ Function LoopRemoteCmd($msg, $cmd) {
 		
         # Remote Posh
         Write-Host ">> invoke on $addr" -Fore "Green"
-        $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
-        if (!$remote) {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
-        }
-        Start-Sleep 3
-		
+        
+        # Dynamic open PSSesion
+        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+        $sb = [Scriptblock]::Create($cmd)
+        Invoke-Command -ScriptBlock $sb
+
         # Invoke
+        Start-Sleep 3
         foreach ($s in $sb) {
             Write-Host $s.ToString()
             if ($remote) {
@@ -708,10 +725,13 @@ Function UpgradeContent() {
     # Open sessions
     foreach ($server in $global:servers) {
         $addr = $server.Address
-        $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication CredSSP -ErrorAction SilentlyContinue
-        if (!$remote) {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue 
-        }
+        
+        # Dynamic open PSSesion
+        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+        $sb = [Scriptblock]::Create($cmd)
+        Invoke-Command -ScriptBlock $sb
     }
 
     # Monitor and Run loop
@@ -768,7 +788,13 @@ Function UpgradeContent() {
                     Get-PSSession | Format-Table -AutoSize
                     $session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
                     if (!$session) {
-                        $session = New-PSSession -ComputerName $pc -Credential $global:cred -Authentication Negotiate -ErrorAction SilentlyContinue
+                        
+                        # Dynamic open PSSesion
+                        $cmd = "`$session = New-PSSession -ComputerName `$pc -Credential `$global:cred -Authentication Negotiate -ErrorAction SilentlyContinue"
+                        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+                        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+                        $sb = [Scriptblock]::Create($cmd)
+                        Invoke-Command -ScriptBlock $sb
                     }
                     $result = Invoke-Command $remoteCmd -Session $session -AsJob
 					
@@ -1135,7 +1161,13 @@ function PreflightCheck() {
         foreach ($server in $global:servers) {
             $addr = $server.Address
             if ($addr -ne $env:computername) {
-                $s = New-PSSession -ComputerName $env:computername -Credential $global:cred -Authentication CredSSP
+                
+                # Dynamic open PSSesion
+                $cmd = "`$s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
+                if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+                if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+                $sb = [Scriptblock]::Create($cmd)
+                Invoke-Command -ScriptBlock $sb
             }
         }
         Write-Host "Starting preflight check succeeded" -Fore Green
@@ -1151,7 +1183,7 @@ function Email-Transcript ($logPath) {
     # Email transcrit LOG file
     if ($emailReportServer -and $emailReportTo -and $emailReportFrom) {
         $msg = New-Object System.Net.Mail.MailMessage
-        $msg.From = $emailReportFrom
+        $msg.From = "sppatchify@" + $env:userdnsdomain
         $msg.To.Add($emailReportTo) 
         $pc = $env:COMPUTERNAME
         $msg.Subject = "SPPatchify - $pc" 
@@ -1185,7 +1217,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.85 last modified 03-10-2018"
+    "SPPatchify version 0.86 last modified 03-27-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
