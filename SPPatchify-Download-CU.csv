@@ -46,6 +46,9 @@ Year,Month,Product,URL
 2016,5,SP16,https://download.microsoft.com/download/7/D/A/7DA2A7E4-1903-45DA-A1AF-1DF8E79CBABB/wssloc2016-kb2920690-fullfile-x64-glb.exe
 2016,5,SP16,https://download.microsoft.com/download/1/D/2/1D2C38A0-4AE7-47B3-9365-F603CBF1F154/sts2016-kb3115088-fullfile-x64-glb.exe
 2016,4,SP16,https://download.microsoft.com/download/8/D/5/8D589BA9-3EA3-4AF8-A5D6-7BC4DE028531/sts2016-kb2920721-fullfile-x64-glb.exe
+2018,3,SP15,https://download.microsoft.com/download/E/C/F/ECF5572E-366D-4D1B-9597-BD94CD4E8BBD/ubersrv2013-kb4018302-fullfile-x64-glb.exe
+2018,3,SP15,https://download.microsoft.com/download/E/C/F/ECF5572E-366D-4D1B-9597-BD94CD4E8BBD/ubersrv_1.cab
+2018,3,SP15,https://download.microsoft.com/download/E/C/F/ECF5572E-366D-4D1B-9597-BD94CD4E8BBD/ubersrv_2.cab
 2018,2,SP15,https://download.microsoft.com/download/F/7/5/F752CC76-FD01-4CA1-803E-23B9975CBDD2/ubersrv2013-kb4011696-fullfile-x64-glb.exe
 2018,2,SP15,https://download.microsoft.com/download/F/7/5/F752CC76-FD01-4CA1-803E-23B9975CBDD2/ubersrv_1.cab
 2018,2,SP15,https://download.microsoft.com/download/F/7/5/F752CC76-FD01-4CA1-803E-23B9975CBDD2/ubersrv_2.cab
@@ -83,6 +86,9 @@ Year,Month,Product,URL
 2017,1,SP15,https://download.microsoft.com/download/A/E/B/AEBBF76F-823F-4A0A-A398-183641466737/ubersrv2013-kb3141481-fullfile-x64-glb.exe
 2017,1,SP15,https://download.microsoft.com/download/A/E/B/AEBBF76F-823F-4A0A-A398-183641466737/ubersrv_1.cab
 2017,1,SP15,https://download.microsoft.com/download/A/E/B/AEBBF76F-823F-4A0A-A398-183641466737/ubersrv_2.cab
+2018,3,PROJ15,https://download.microsoft.com/download/9/0/A/90A4B1A8-BF5C-4D54-A380-D868573B96A9/ubersrvprj2013-kb4018301-fullfile-x64-glb.exe
+2018,3,PROJ15,https://download.microsoft.com/download/9/0/A/90A4B1A8-BF5C-4D54-A380-D868573B96A9/ubersrvprj_1.cab
+2018,3,PROJ15,https://download.microsoft.com/download/9/0/A/90A4B1A8-BF5C-4D54-A380-D868573B96A9/ubersrvprj_2.cab
 2018,2,PROJ15,https://download.microsoft.com/download/9/E/E/9EE6402E-F5DF-49A3-A70F-0F05F762D66D/ubersrvprj2013-kb4011694-fullfile-x64-glb.exe
 2018,2,PROJ15,https://download.microsoft.com/download/9/E/E/9EE6402E-F5DF-49A3-A70F-0F05F762D66D/ubersrvprj_1.cab
 2018,2,PROJ15,https://download.microsoft.com/download/9/E/E/9EE6402E-F5DF-49A3-A70F-0F05F762D66D/ubersrvprj_2.cab
