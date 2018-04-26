@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.88
+	Version			: 0.89
 	Last Modified	: 04-26-2018
 .LINK
 	Source Code
@@ -63,7 +63,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.88"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.89"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -89,7 +89,7 @@ Function CopyEXE($action) {
         if ($addr -ne $env:computername) {
 
             # Dynamic open PSSesion
-            $cmd = "`$s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
+            $cmd = "`$global:s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
             if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
             if ($remoteSessionSSL) { $cmd += " -UseSSL"}
             $sb = [Scriptblock]::Create($cmd)
@@ -99,7 +99,7 @@ Function CopyEXE($action) {
             $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0"
             Write-Host $cmd -Fore Yellow
             $sb = [Scriptblock]::Create($cmd)
-            Invoke-Command -ScriptBlock $sb -Session $s -AsJob
+            Invoke-Command -ScriptBlock $sb -Session $global:s -AsJob
         }
     }
 
@@ -1230,7 +1230,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.88 last modified 04-26-2018"
+    "SPPatchify version 0.89 last modified 04-26-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
