@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.87
-	Last Modified	: 04-18-2018
+	Version			: 0.88
+	Last Modified	: 04-26-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -63,7 +63,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.87"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.88"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -112,7 +112,9 @@ Function CopyEXE($action) {
             # Progress
             if (Get-Job) {
                 $prct = [Math]::Round(($counter / (Get-Job).Count) * 100)
-                Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
+                if ($prct) {
+                    Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
+                }
             }
 			
             # GUI In Progress
@@ -228,7 +230,9 @@ Function WaitEXE($patchName) {
             # Progress
             $addr = $server.Address
             $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
-            Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+            if ($prct) {
+                Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+            }
             $counter++
             
             # Remote Posh
@@ -271,7 +275,9 @@ Function WaitReboot() {
         # Progress
         $addr = $server.Address
         $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
-        Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+        if ($prct) {
+            Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+        }
         $counter++
 		
         # Remote PowerShell session
@@ -364,7 +370,9 @@ Function LoopRemoteCmd($msg, $cmd) {
         # Progress
         $addr = $server.Address
         $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
-        Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
+        if ($prct) {
+            Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
+        }
         $counter++
 		
         # GUI - In Progress
@@ -549,11 +557,15 @@ Function ChangeContent($state) {
                 
                 # Progress
                 $prct = [Math]::Round(($counter / $dbs.Count) * 100)
-                Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                if ($prct) {
+                    Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                }
                 $counter++
             
                 $wa = Get-SPWebApplication $_.WebApp
-                Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+                if ($wa) {
+                    Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+                }
             }
         }
     }
@@ -809,8 +821,9 @@ Function UpgradeContent() {
                 if ($track) {
                     $prct = [Math]::Round(($counter / $track.Count) * 100)
                 }
-          
-                Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                if ($prct) {
+                    Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                }
                 $track | Format-Table -AutoSize
 				
                 # GUI
@@ -1217,7 +1230,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.87 last modified 04-18-2018"
+    "SPPatchify version 0.88 last modified 04-26-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
