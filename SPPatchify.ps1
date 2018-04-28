@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.89
-	Last Modified	: 04-26-2018
+	Version			: 0.90
+	Last Modified	: 04-28-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -63,7 +63,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.89"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.90"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -193,20 +193,42 @@ Function RunEXE() {
     LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
 	
     # Build CMD
-    $ver = (Get-SPFarm).BuildVersion.Major
-    $files = Get-ChildItem "$root\media\*.exe" | sort Name
+    $files = Get-ChildItem "$root\media\*.exe" | Sort-Object Name
     foreach ($f in $files) {
         $name = $f.Name
         $patchName = $name.replace(".exe", "")
-        $cmd = "Start-Process '$root\media\$name' -ArgumentList '/passive /forcerestart /log:""$root\log\$name.log""' -PassThru"
-        if ($ver -eq 16 -or $env:computername -eq $server.Address) {
-            $cmd = $cmd.replace("forcerestart", "norestart")
+        $cmd = "$root\media\$name"
+        $params = "/passive /forcerestart /log:""$root\log\$name.log"""
+        $taskName = "SPPatchify"
+
+        # Loop servers
+        foreach ($server in $global:servers) {
+            $addr = $server.Address
+
+            # Task Scheduler
+            $found = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue -CimSession $addr
+            if ($found) {
+                $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
+            }
+            $user = $global:username
+            $pw = $global:userpass
+            $folder = Split-Path $file
+            $a = New-ScheduledTaskAction -Execute $cmd -Argument $params -WorkingDirectory $folder -CimSession $addr
+            $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType Password
+            $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
+            Register-ScheduledTask -TaskName $taskName -InputObject $task -Password $pw -User $user -CimSession $addr
+            Start-ScheduledTask -TaskName $taskName -CimSession $addr
+
+            # Wait and check status
+            do {
+                Write-Host "." -NoNewLine
+                Start-Sleep 5
+                $state = (Get-ScheduledTask -TaskName $taskName -CimSession $addr).State
+            } while ($state -eq "Running")
         }
-        LoopRemoteCmd "Run EXE on " $cmd
-        WaitEXE $patchName
     }
 	
-    # Reboot
+    # SharePoint 2016 Force Reboot
     if ($ver -eq 16) {
         foreach ($server in $global:servers) {
             if ($server.Address -ne $env:computername) {
@@ -321,6 +343,79 @@ Function LocalReboot() {
 #endregion
 
 #region SP Config Wizard
+Function LoopRemotePatch($msg, $cmd, $params) {
+    if (!$cmd) {
+        return
+    }
+
+    # Clean up
+    Get-PSSession | Remove-PSSession
+	
+    # GUI
+    $stage = "RunEXE"
+    if ($stage) {
+        $coll = newStatus($stage)
+    }
+	
+    # Loop servers
+    $counter = 0
+    foreach ($server in $global:servers) {
+        # Overwrite restart parameter
+        $ver = (Get-SPFarm).BuildVersion.Major
+        if ($ver -eq 16 -or $env:computername -eq $server.Address) {
+            $cmd = $cmd.replace("forcerestart", "norestart")
+        }
+
+        # Script block
+        if ($cmd.GetType().Name -eq "String") {
+            $sb = [ScriptBlock]::Create($cmd)
+        }
+        else {
+            $sb = $cmd
+        }
+	
+        # Progress
+        $addr = $server.Address
+        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
+        if ($prct) {
+            Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
+        }
+        $counter++
+		
+        # GUI - In Progress
+        if ($stage) {
+            ($coll |? {$_.Server -eq $server.Address})."$stage" = 1
+            displayStatus $coll
+        }
+		
+        # Remote Posh
+        Write-Host ">> invoke on $addr" -Fore "Green"
+        
+        # Dynamic open PSSesion
+        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+        $sb = [Scriptblock]::Create($cmd)
+        Invoke-Command -ScriptBlock $sb
+
+        # Invoke
+        Start-Sleep 3
+        foreach ($s in $sb) {
+            Write-Host $s.ToString()
+            if ($remote) {
+                Invoke-Command -Session $remote -ScriptBlock $s
+            }
+        }
+        Write-Host "<< complete on $addr" -Fore "Green"
+		
+        # GUI - Done
+        if ($stage) {
+            ($coll |? {$_.Server -eq $server.Address})."$stage" = 2
+            displayStatus $coll
+        }
+    }
+    Write-Progress -Activity "Completed $(Get-Date)" -Completed	
+}
 Function LoopRemoteCmd($msg, $cmd) {
     if (!$cmd) {
         return
@@ -635,6 +730,8 @@ Function ReadIISPW {
     else {
         $sec = $pass | ConvertTo-SecureString -AsPlainText -Force
     }
+    $global:username = $user
+    $global:userpass = $pass
     $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user", $sec
 }
 
@@ -1169,7 +1266,7 @@ function launchIE($file) {
 
 function PreflightCheck() {
     try {
-        Write-Host "Starting preflight check " -Fore Green
+        Write-Host "Check Remote PowerShell " -Fore Green
         # Start Jobs
         foreach ($server in $global:servers) {
             $addr = $server.Address
@@ -1183,9 +1280,27 @@ function PreflightCheck() {
                 Invoke-Command -ScriptBlock $sb
             }
         }
-        Write-Host "Starting preflight check succeeded" -Fore Green
-        return $true
+        Write-Host "Succeess" -Fore Green
 
+
+        Write-Host "Claer CACHE.INI " -Fore Green
+        # Get the local farm instance
+        $farm = Get-SPServer |? {($_.Role -ne "Invalid")}
+
+        # Stop the SharePoint Timer Service on each server in the farm
+        StopSharePointTimerServicesInFarm $farm
+
+        # Delete all xml files from cache config folder on each server in the farm
+        DeleteXmlFilesFromConfigCache $farm
+
+        # Clear the timer cache on each server in the farm
+        ClearTimerCache $farm
+
+        # Start the SharePoint Timer Service on each server in the farm
+        StartSharePointTimerServicesInFarm $farm
+        Write-Host "Succeess" -Fore Green
+
+        return $true
     }
     catch {
         throw 'Not able to connect to one or more computers in the farm. Please make sure you have run run Enable-PSRemoting and Enable-WSManCredSSP -Role Server'
@@ -1207,6 +1322,171 @@ function Email-Transcript ($logPath) {
         $smtp.UseDefaultCredentials = $true 
         $smtp.Send($msg) 
     }
+}
+#**************************************************************************************
+# Constants
+#**************************************************************************************
+Set-Variable timerServiceName -option Constant -value "SPTimerV4"
+Set-Variable timerServiceInstanceName -option Constant -value "Microsoft SharePoint Foundation Timer"
+
+#**************************************************************************************
+# Functions
+#**************************************************************************************
+#<summary>
+# Loads the SharePoint Powershell Snapin.
+#</summary>
+Function Load-SharePoint-Powershell {
+    If ((Get-PsSnapin |? {$_.Name -eq "Microsoft.SharePoint.PowerShell"}) -eq $null) {
+        Write-Host -ForegroundColor White " - Loading SharePoint Powershell Snapin"
+        Add-PsSnapin Microsoft.SharePoint.PowerShell -ErrorAction Stop
+    }
+}
+
+#<summary>
+# Stops the SharePoint Timer Service on each server in the SharePoint Farm.
+#</summary>
+#<param name="$farm">The SharePoint farm object.</param>
+function StopSharePointTimerServicesInFarm($farm) {
+    Write-Host ""
+
+    # Iterate through each server in the farm, and each service in each server
+    foreach ($server in $farm) {
+        foreach ($instance in $server.ServiceInstances) {
+            # If the server has the timer service then stop the service
+            if ($instance.TypeName -eq $timerServiceInstanceName) {
+                [string]$serverName = $server.Name
+
+                Write-Host -foregroundcolor DarkGray -NoNewline "Stop '$timerServiceName' service on server: "
+                Write-Host -foregroundcolor Gray $serverName
+
+                $service = Get-WmiObject -ComputerName $serverName Win32_Service -Filter "Name='$timerServiceName'"
+                sc.exe \\$serverName stop $timerServiceName > $null
+
+                # Wait until this service has actually stopped
+                WaitForServiceState $serverName $timerServiceName "Stopped"
+
+                break;
+            }
+        }
+    }
+
+    Write-Host ""
+}
+
+#<summary>
+# Waits for the service on the server to reach the required service state.
+# This can be used to wait for the "SharePoint 2010 Timer" service to stop or to start
+#</summary>
+#<param name="$serverName">The name of the server with the service to monitor.</param>
+#<param name="$serviceName">The name of the service to monitor.</param>
+#<param name="$serviceState">The service state to wait for, e.g. Stopped, or Running.</param>
+function WaitForServiceState([string]$serverName, [string]$serviceName, [string]$serviceState) {
+    Write-Host -foregroundcolor DarkGray -NoNewLine "Waiting for service '$serviceName' to change state to $serviceState on server $serverName"
+
+    do {
+        Start-Sleep 1
+        Write-Host -foregroundcolor DarkGray -NoNewLine "."
+        $service = Get-WmiObject -ComputerName $serverName Win32_Service -Filter "Name='$serviceName'"
+    }
+    while ($service.State -ne $serviceState)
+
+    Write-Host -foregroundcolor DarkGray -NoNewLine " Service is "
+    Write-Host -foregroundcolor Gray $serviceState
+}
+
+#<summary>
+# Starts the SharePoint Timer Service on each server in the SharePoint Farm.
+#</summary>
+#<param name="$farm">The SharePoint farm object.</param>
+function StartSharePointTimerServicesInFarm($farm) {
+    Write-Host ""
+
+    # Iterate through each server in the farm, and each service in each server
+    foreach ($server in $farm) {
+        foreach ($instance in $server.ServiceInstances) {
+            # If the server has the timer service then start the service
+            if ($instance.TypeName -eq $timerServiceInstanceName) {
+                [string]$serverName = $server.Name
+
+                Write-Host -foregroundcolor DarkGray -NoNewline "Start '$timerServiceName' service on server: "
+                Write-Host -foregroundcolor Gray $serverName
+
+                $service = Get-WmiObject -ComputerName $serverName Win32_Service -Filter "Name='$timerServiceName'"
+                sc.exe \\$serverName start $timerServiceName > $null
+
+                WaitForServiceState $serverName $timerServiceName "Running"
+
+                break;
+            }
+        }
+    }
+
+    Write-Host ""
+}
+
+#<summary>
+# Removes all xml files recursive on an UNC path
+#</summary>
+#<param name="$farm">The SharePoint farm object.</param>
+function DeleteXmlFilesFromConfigCache($farm) {
+    Write-Host ""
+    Write-Host -foregroundcolor DarkGray "Delete xml files"
+
+    [string] $path = ""
+
+    # Iterate through each server in the farm, and each service in each server
+    foreach ($server in $farm) {
+        foreach ($instance in $server.ServiceInstances) {
+            # If the server has the timer service delete the XML files from the config cache
+            if ($instance.TypeName -eq $timerServiceInstanceName) {
+                [string]$serverName = $server.Name
+
+                Write-Host -foregroundcolor DarkGray -NoNewline "Deleting xml files from config cache on server: "
+                Write-Host -foregroundcolor Gray $serverName
+
+                # Remove all xml files recursive on an UNC path
+                $path = "\\" + $serverName + "\c$\ProgramData\Microsoft\SharePoint\Config\*-*\*.xml"
+                Remove-Item -path $path -Force
+
+                break
+            }
+        }
+    }
+
+    Write-Host ""
+}
+
+#<summary>
+# Clears the SharePoint cache on an UNC path
+#</summary>
+#<param name="$farm">The SharePoint farm object.</param>
+function ClearTimerCache($farm) {
+    Write-Host ""
+    Write-Host -foregroundcolor DarkGray "Clear the cache"
+
+    [string] $path = ""
+
+    # Iterate through each server in the farm, and each service in each server
+    foreach ($server in $farm) {
+        foreach ($instance in $server.ServiceInstances) {
+            # If the server has the timer service then force the cache settings to be refreshed
+            if ($instance.TypeName -eq $timerServiceInstanceName) {
+                [string]$serverName = $server.Name
+
+                Write-Host -foregroundcolor DarkGray -NoNewline "Clearing timer cache on server: "
+                Write-Host -foregroundcolor Gray $serverName
+
+                # Clear the cache on an UNC path
+                # 1 = refresh all cache settings
+                $path = "\\" + $serverName + "\c$\ProgramData\Microsoft\SharePoint\Config\*-*\cache.ini"
+                Set-Content -path $path -Value "1"
+
+                break
+            }
+        }
+    }
+
+    Write-Host ""
 }
 
 function Main() {
@@ -1230,7 +1510,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.89 last modified 04-26-2018"
+    "SPPatchify version 0.90 last modified 04-28-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
