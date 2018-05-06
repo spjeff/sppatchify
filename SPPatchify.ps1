@@ -1304,7 +1304,7 @@ function PreflightCheck() {
         Write-Host "Succeess" -Fore Green
 
 
-        Write-Host "Claer CACHE.INI " -Fore Green
+        Write-Host "Clear CACHE.INI " -Fore Green
         # Get the local farm instance
         $farm = Get-SPServer |? {($_.Role -ne "Invalid")}
 
