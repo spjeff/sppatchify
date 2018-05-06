@@ -655,25 +655,30 @@ Function ChangeContent($state) {
         }
 		
         # Loop databases
-        $dbs = Import-Csv $files.Fullname
-        $counter = 0
-        if ($dbs) {
-            $dbs | % {
-                $name = $_.Name
-                $name
+        if ($files) {
+            Write-Host "Content DB - Mount from CSV $($files.Fullname)" -Fore Yellow
+            $dbs = Import-Csv $files.Fullname
+            $counter = 0
+            if ($dbs) {
+                $dbs | % {
+                    $name = $_.Name
+                    $name
                 
-                # Progress
-                $prct = [Math]::Round(($counter / $dbs.Count) * 100)
-                if ($prct) {
-                    Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
-                }
-                $counter++
+                    # Progress
+                    $prct = [Math]::Round(($counter / $dbs.Count) * 100)
+                    if ($prct) {
+                        Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
+                    }
+                    $counter++
             
-                $wa = Get-SPWebApplication $_.WebApp
-                if ($wa) {
-                    Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+                    $wa = Get-SPWebApplication $_.WebApp
+                    if ($wa) {
+                        Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
+                    }
                 }
             }
+        } else {
+            Write-Host "Content DB - CSV not found" -Fore Yellow
         }
     }
 }
