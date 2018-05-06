@@ -553,7 +553,7 @@ Function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -569,7 +569,7 @@ Function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | % {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
