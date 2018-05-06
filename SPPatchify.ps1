@@ -209,11 +209,10 @@ Function RunEXE() {
         $params = "/passive /forcerestart /log:""$root\log\$name.log"""
         $taskName = "SPPatchify"
 
-        # Loop servers
+
+        # Loop - Run Task Scheduler
         foreach ($server in $global:servers) {
             $addr = $server.Address
-
-            # Task Scheduler - Register
             $found = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue -CimSession $addr
             if ($found) {
                 $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
@@ -224,10 +223,16 @@ Function RunEXE() {
             $a = New-ScheduledTaskAction -Execute $cmd -Argument $params -WorkingDirectory $folder -CimSession $addr
             $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType Password
             $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
+
+            Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
             Register-ScheduledTask -TaskName $taskName -InputObject $task -Password $pw -User $user -CimSession $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
-
-            # Wait and check status
+        }
+            
+        # Loop - Wait and check status
+        foreach ($server in $global:servers) {
+            $addr = $server.Address
+            Write-Host "Monitor SCHTASK - $addr " -Fore Yellow
             do {
                 Write-Host "." -NoNewLine
                 Start-Sleep 5
@@ -235,15 +240,16 @@ Function RunEXE() {
             } while ($state -eq "Running")
         }
     }
+}
 	
-    # SharePoint 2016 Force Reboot
-    if ($ver -eq 16) {
-        foreach ($server in $global:servers) {
-            if ($server.Address -ne $env:computername) {
-                Restart-Computer -ComputerName $server.Address
-            }
+# SharePoint 2016 Force Reboot
+if ($ver -eq 16) {
+    foreach ($server in $global:servers) {
+        if ($server.Address -ne $env:computername) {
+            Restart-Computer -ComputerName $server.Address
         }
     }
+}
 }
 
 Function WaitEXE($patchName) {
@@ -677,7 +683,8 @@ Function ChangeContent($state) {
                     }
                 }
             }
-        } else {
+        }
+        else {
             Write-Host "Content DB - CSV not found" -Fore Yellow
         }
     }
