@@ -108,9 +108,9 @@ Function CopyEXE($action) {
     Start-Sleep 5
     $coll = newStatus("CopyEXE")
 
-Write-Host "newStatus ===" -ForegroundColor Green
-$coll | ft -a
-Write-Host "===" -ForegroundColor Green
+    Write-Host "newStatus ===" -ForegroundColor Green
+    $coll | ft -a
+    Write-Host "===" -ForegroundColor Green
 
     $counter = 0
     do {
@@ -294,7 +294,7 @@ Function WaitEXE($patchName) {
 Function WaitReboot() {
     Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore "Yellow"
 	
-    # Wait for reboot
+    # Wait for farm peer machines to reboot
     Write-Host "Wait 60 sec..."
     Start-Sleep 60
 	
@@ -306,27 +306,28 @@ Function WaitReboot() {
     foreach ($server in $global:servers) {
         # Progress
         $addr = $server.Address
-        $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
-        if ($prct) {
-            Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
-        }
-        $counter++
+        if ($addr -ne $env:COMPUTERNAME) {
+            $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
+            if ($prct) {
+                Write-Progress -Activity "Waiting for machine ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
+            }
+            $counter++
 		
-        # Remote PowerShell session
-        do {
+            # Remote PowerShell session
+            do {
+                # Dynamic open PSSession
+                $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+                if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
+                if ($remoteSessionSSL) { $cmd += " -UseSSL"}
+                $sb = [Scriptblock]::Create($cmd)
+                Invoke-Command -ScriptBlock $sb
 
-            # Dynamic open PSSession
-            $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-            if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-            if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-            $sb = [Scriptblock]::Create($cmd)
-            Invoke-Command -ScriptBlock $sb
-
-            # Display
-            Write-Host "."  -NoNewLine
-            Start-Sleep 5
+                # Display
+                Write-Host "."  -NoNewLine
+                Start-Sleep 5
+            }
+            while (!$remote)
         }
-        while (!$remote)
     }
 	
     # Clean up
