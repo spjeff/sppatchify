@@ -196,6 +196,7 @@ Function RunEXE() {
     $files = Get-ChildItem "$root\media\*.exe" | Sort-Object Name
     foreach ($f in $files) {
         $name = $f.Name
+        Write-Host $name -Fore Yellow
         $patchName = $name.replace(".exe", "")
         $cmd = "$root\media\$name"
         $params = "/passive /forcerestart /log:""$root\log\$name.log"""
