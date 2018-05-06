@@ -107,11 +107,7 @@ Function CopyEXE($action) {
     # Watch Jobs
     Start-Sleep 5
     $coll = newStatus("CopyEXE")
-
-    Write-Host "newStatus ===" -ForegroundColor Green
     $coll | ft -a
-    $coll | fl
-    Write-Host "===" -ForegroundColor Green
 
     $counter = 0
     do {
