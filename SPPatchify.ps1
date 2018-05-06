@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.90
-	Last Modified	: 04-28-2018
+	Version			: 0.91
+	Last Modified	: 05-06-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -63,7 +63,7 @@ param (
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.90"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.91"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -212,7 +212,7 @@ Function RunEXE() {
             }
             $user = $global:username
             $pw = $global:userpass
-            $folder = Split-Path $file
+            $folder = Split-Path $f
             $a = New-ScheduledTaskAction -Execute $cmd -Argument $params -WorkingDirectory $folder -CimSession $addr
             $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType Password
             $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
@@ -1510,7 +1510,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.90 last modified 04-28-2018"
+    "SPPatchify version 0.91 last modified 05-06-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
