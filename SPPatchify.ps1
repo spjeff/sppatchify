@@ -1539,6 +1539,8 @@ function Main() {
 
     # Local farm servers
     $global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
+    Write-Host "Servers" -Fore Yellow
+    $global:servers | ft -a
     ReadIISPW    
     if (-not (PreflightCheck)) {
         return
