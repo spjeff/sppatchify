@@ -240,16 +240,15 @@ Function RunEXE() {
             } while ($state -eq "Running")
         }
     }
-}
 	
-# SharePoint 2016 Force Reboot
-if ($ver -eq 16) {
-    foreach ($server in $global:servers) {
-        if ($server.Address -ne $env:computername) {
-            Restart-Computer -ComputerName $server.Address
+    # SharePoint 2016 Force Reboot
+    if ($ver -eq 16) {
+        foreach ($server in $global:servers) {
+            if ($server.Address -ne $env:computername) {
+                Restart-Computer -ComputerName $server.Address
+            }
         }
     }
-}
 }
 
 Function WaitEXE($patchName) {
