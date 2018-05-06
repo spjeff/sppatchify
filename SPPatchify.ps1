@@ -61,6 +61,7 @@ param (
 
 # Plugin
 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
+Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
 
 # Version
 $host.ui.RawUI.WindowTitle = "SPPatchify v0.91"
@@ -106,6 +107,11 @@ Function CopyEXE($action) {
     # Watch Jobs
     Start-Sleep 5
     $coll = newStatus("CopyEXE")
+
+Write-Host "newStatus ===" -ForegroundColor Green
+$coll | ft -a
+Write-Host "===" -ForegroundColor Green
+
     $counter = 0
     do {
         foreach ($server in $global:servers) {
@@ -206,7 +212,7 @@ Function RunEXE() {
         foreach ($server in $global:servers) {
             $addr = $server.Address
 
-            # Task Scheduler
+            # Task Scheduler - Register
             $found = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue -CimSession $addr
             if ($found) {
                 $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
@@ -265,17 +271,20 @@ Function WaitEXE($patchName) {
                 $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
                 Write-Host "." -NoNewLine
                 Start-Sleep 5
+
+                # Measure EXE
+                $stats = $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
                 
                 # Count MSPLOG files
                 $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
                 $sb = [Scriptblock]::Create($cmd)
-                $msp = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-                $msp = $msp | select Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | sort LastWriteTime, Server -desc
+                $result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
+                $msp = $result | Select-Object Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | Sort-Object LastWriteTime, Server -Desc
                 
                 # HTML view
                 $coll = newStatus("RunEXE")
                 ($coll |? {$_.Server -eq $addr}).RunEXE = 1
-                displayStatus $coll $false $false $msp
+                displayStatus $coll $false $false $msp $stats
             }
             while ($proc)
         }
@@ -1195,7 +1204,7 @@ function newStatus($currentStage) {
     return $coll
 }
 
-function displayStatus($coll, $px, $msg, $msp) {
+function displayStatus($coll, $px, $msg, $msp, $stats) {
     # Percent display
     $c = 0
     foreach ($row in $coll) {
@@ -1228,14 +1237,19 @@ function displayStatus($coll, $px, $msg, $msp) {
     # Generate HTML
     $file = "$root\sppatchify-status.html"
     $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
+
+    # Measure EXE
+    if ($stats) {
+        $foot = ($stats | ConvertTo-Html -Fragment) + $foot
+    }
 	
     # MSPLOG second table
     if ($msp) {
         $foot = ($msp | ConvertTo-Html -Fragment) + $foot
     }
 
-    # Colors
-    $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
+    # HTML Footer and Color
+    $html = $coll | ConvertTo-Html -Head $meta -PostContent $footer
     $html = $html.replace("<table", "<table border=0 cellpadding=6 cellspacing=0")
     $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
