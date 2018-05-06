@@ -110,6 +110,7 @@ Function CopyEXE($action) {
 
     Write-Host "newStatus ===" -ForegroundColor Green
     $coll | ft -a
+    $coll | fl
     Write-Host "===" -ForegroundColor Green
 
     $counter = 0
@@ -1180,8 +1181,7 @@ Function StartServiceInst() {
 function newStatus($currentStage) { 
     # Servers (rows)
     $coll = @()
-    $servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Name
-    foreach ($server in $servers) {
+    foreach ($server in $global:servers) {
         $row = New-Object -TypeName PSObject -Property @{Server = $server.Name; Role = $server.Role}
         $coll += $row
     }
