@@ -1632,6 +1632,14 @@ function Main() {
     }
 	
     # Cleanup
+    # Loop - Run Task Scheduler
+    foreach ($server in $global:servers) {
+        $addr = $server.Address
+        $found = Get-ScheduledTask -TaskName "SPPatchify" -ErrorAction SilentlyContinue -CimSession $addr
+        if ($found) {
+            $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
+        }
+    }
     Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
     Stop-Transcript
     Email-Transcript
