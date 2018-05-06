@@ -1539,17 +1539,19 @@ function Main() {
     $msg +=	"copy = $copyMediaOnly"
     $msg +=	"version = $showVersion"
     $msg +=	"phaseTwo = $phaseTwo"
-    $c = (Get-SPContentDatabase).Count
-    Write-Host "Content Databases Online: $c"
+    Write-Host "Content Databases Online: $(Get-SPContentDatabase).Count)"
 
     # Local farm servers
     $global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
-    Write-Host "Servers" -Fore Yellow
-    $global:servers | ft -a
+    Write-Host "Servers Online: $($global:servers)"
+    
+    # Read IIS Password
     ReadIISPW    
     if (-not (PreflightCheck)) {
         return
     }    
+
+    # Prepare \LOG\ folder
     LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
 
     # Core steps
