@@ -1539,7 +1539,7 @@ function Main() {
     $msg +=	"copy = $copyMediaOnly"
     $msg +=	"version = $showVersion"
     $msg +=	"phaseTwo = $phaseTwo"
-    Write-Host "Content Databases Online: $(Get-SPContentDatabase).Count)"
+    Write-Host "Content Databases Online: $((Get-SPContentDatabase).Count)"
 
     # Local farm servers
     $global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
