@@ -188,7 +188,9 @@ Function SafetyEXE() {
 
 Function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
-	
+    $coll = newStatus("RunEXE")
+    displayStatus $coll
+    
     # Remove MSPLOG
     LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
 	
@@ -198,6 +200,7 @@ Function RunEXE() {
     # Build CMD
     $files = Get-ChildItem "$root\media\*.exe" | Sort-Object Name
     foreach ($f in $files) {
+        # Display patch name
         $name = $f.Name
         Write-Host $name -Fore Yellow
         $patchName = $name.replace(".exe", "")
