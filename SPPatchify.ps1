@@ -1250,7 +1250,7 @@ function displayStatus($coll, $px, $msg, $msp, $stats) {
     }
 
     # HTML Footer and Color
-    $html = $coll | ConvertTo-Html -Head $meta -PostContent $footer
+    $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
     $html = $html.replace("<table", "<table border=0 cellpadding=6 cellspacing=0")
     $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
     $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
