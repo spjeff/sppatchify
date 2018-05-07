@@ -113,7 +113,7 @@ Function CopyEXE($action) {
     # Watch Jobs
     Start-Sleep 5
     $coll = newStatus("CopyEXE")
-    $coll | ft -a
+    $coll | Format-Table -AutoSize
 
     $counter = 0
     do {
@@ -127,30 +127,30 @@ Function CopyEXE($action) {
             }
 			
             # GUI In Progress
-            ($coll |? {$_.Server -eq $server.Address}).CopyEXE = 1
+            ($coll |Where-Object {$_.Server -eq $server.Address}).CopyEXE = 1
             displayStatus $coll
 			
             # Check Job Status
             foreach ($job in Get-Job) {
-                Get-Job | ft -a
+                Get-Job | Format-Table -AutoSize
                 if ($job.State -ne "Running") {
                     # GUI Done
                     $addr = $job.Command.Split(";")[0].Replace("#", "")
-                    ($coll |? {$_.Server -eq $addr}).CopyEXE = 2
+                    ($coll | Where-Object {$_.Server -eq $addr}).CopyEXE = 2
                     displayStatus $coll
                 }
             }
 			
         }
         Start-Sleep 5
-        $pending = Get-Job |? {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
+        $pending = Get-Job |Where-Object {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
         $counter = (Get-Job).Count - $pending.Count
     }
     while ($pending)
 
     # Complete
     Get-Job | Format-Table -a
-    $coll | % {$_.CopyEXE = 2}
+    $coll | ForEach-Object {$_.CopyEXE = 2}
     displayStatus $coll
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
@@ -158,11 +158,11 @@ Function CopyEXE($action) {
 Function SafetyInstallRequired() {
     # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
-    (Get-SPProduct).Servers | Select Servername, InstallStatus | Sort Servername | ft -a
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
 	
-    $halt = (Get-SPProduct).Servers |? {$_.InstallStatus -eq "InstallRequired"}
+    $halt = (Get-SPProduct).Servers |Where-Object {$_.InstallStatus -eq "InstallRequired"}
     if ($halt) {
-        $halt | ft -a
+        $halt | Format-Table -AutoSize
         Write-Host "HALT - MEDIA ERROR - Install on servers" -Fore Red
         Exit
     }
@@ -303,7 +303,7 @@ Function WaitEXE($patchName) {
                 
                 # HTML view
                 $coll = newStatus("RunEXE")
-                ($coll |? {$_.Server -eq $addr}).RunEXE = 1
+                ($coll |Where-Object {$_.Server -eq $addr}).RunEXE = 1
                 displayStatus $coll $false $false $msp $stats
             }
             while ($proc)
@@ -424,7 +424,7 @@ Function LoopRemotePatch($msg, $cmd, $params) {
 		
         # GUI - In Progress
         if ($stage) {
-            ($coll |? {$_.Server -eq $server.Address})."$stage" = 1
+            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 1
             displayStatus $coll
         }
 		
@@ -457,7 +457,7 @@ Function LoopRemotePatch($msg, $cmd, $params) {
 		
         # GUI - Done
         if ($stage) {
-            ($coll |? {$_.Server -eq $server.Address})."$stage" = 2
+            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 2
             displayStatus $coll
         }
     }
@@ -519,7 +519,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		
         # GUI - In Progress
         if ($stage) {
-            ($coll |? {$_.Server -eq $server.Address})."$stage" = 1
+            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 1
             displayStatus $coll
         }
 		
@@ -560,7 +560,7 @@ Function LoopRemoteCmd($msg, $cmd) {
 		
         # GUI - Done
         if ($stage) {
-            ($coll |? {$_.Server -eq $server.Address})."$stage" = 2
+            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 2
             displayStatus $coll
         }
     }
@@ -579,7 +579,7 @@ Function ChangeDC() {
             $counter = 0
             $maxLoops = 60
 			
-            $cache = Get-CacheHost |? {$_.HostName -eq $computer}
+            $cache = Get-CacheHost |Where-Object {$_.HostName -eq $computer}
             if ($cache) {
                 do {
                     try {
@@ -614,7 +614,7 @@ Function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -636,7 +636,7 @@ Function ChangeServices($state) {
                     Stop-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch$ver", "SPSearchHostController") | % {
+            @("OSearch$ver", "SPSearchHostController") | ForEach-Object {
                 Stop-Service $_ -ErrorAction SilentlyContinue
             }
         }
@@ -681,6 +681,9 @@ Function RunConfigWizard() {
         & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources" -cmd "services" -install
     }
     LoopRemoteCmd "Run Config Wizard on " @($shared, $wiz)
+
+    # Reset PowerShell window
+    powershell -nologo
 }
 
 Function ChangeContent($state) {
@@ -690,8 +693,8 @@ Function ChangeContent($state) {
         # Remove content
         $dbs = Get-SPContentDatabase
         if ($dbs) {
-            $dbs | % {$wa = $_.WebApplication.Url; $_ | select Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
-            $dbs | % {
+            $dbs | ForEach-Object {$wa = $_.WebApplication.Url; $_ | select Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
+            $dbs | ForEach-Object {
                 "$($_.Name),$($_.NormalizedDataSource)"
                 Dismount-SPContentDatabase $_ -Confirm:$false
             }
@@ -710,7 +713,7 @@ Function ChangeContent($state) {
             $dbs = Import-Csv $files.Fullname
             $counter = 0
             if ($dbs) {
-                $dbs | % {
+                $dbs | Where-Object {
                     $name = $_.Name
                     $name
                 
@@ -808,7 +811,7 @@ Function DisplayCA() {
     $sb = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null;
         $ver = (Get-SPFarm).BuildVersion.Major;
-        [System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | select FileVersion, @{N = 'PC'; E = {$env:computername}}
+        [System.Diagnostics.FileVersionInfo]::GetVersionInfo("C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\ISAPI\Microsoft.SharePoint.dll") | Select-Object FileVersion, @{N = 'PC'; E = {$env:computername}}
     }
     LoopRemoteCmd "Get file version on " $sb
 	
@@ -816,9 +819,9 @@ Function DisplayCA() {
     DisplayVersion
 	
     # Open Central Admin
-    $ca = (Get-SPWebApplication -IncludeCentralAdministration) |? {$_.IsAdministrationWebApplication -eq $true}
+    $ca = (Get-SPWebApplication -IncludeCentralAdministration) | Where-Object {$_.IsAdministrationWebApplication -eq $true}
     $pages = @("PatchStatus.aspx", "UpgradeStatus.aspx", "FarmServers.aspx")
-    $pages | % {Start-Process ($ca.Url + "_admin/" + $_)}
+    $pages | ForEach-Object {Start-Process ($ca.Url + "_admin/" + $_)}
 }
 Function DisplayVersion() {
     # Version Max Patch
@@ -827,7 +830,7 @@ Function DisplayVersion() {
     $p = Get-SPProduct
     foreach ($u in $p.PatchableUnitDisplayNames) {
         $n = $u
-        $v = ($p.GetPatchableUnitInfoByDisplayName($n).patches | sort version -desc)[0].version
+        $v = ($p.GetPatchableUnitInfoByDisplayName($n).patches | Sort-Object version -desc)[0].version
         if (!$maxv) {
             $maxv = $v
         }
@@ -916,7 +919,6 @@ Function UpgradeContent() {
         else {
             $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
         }
-        Invoke-Command -ScriptBlock $sb -Session $remote
     }
 
     # Monitor and Run loop
@@ -944,11 +946,11 @@ Function UpgradeContent() {
         # Ensure workers are active
         foreach ($server in $global:servers) {
             # Count active workers per server
-            $active = $track |? {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address}
+            $active = $track |Where-Object {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address}
             if ($active.count -lt $maxWorkers) {
 			
                 # Choose next available DB
-                $avail = $track |? {$_.Status -eq "New" -and $_.UpgradePC -eq $server.Address}
+                $avail = $track |Where-Object {$_.Status -eq "New" -and $_.UpgradePC -eq $server.Address}
                 if ($avail) {
                     if ($avail -is [array]) {
                         $row = $avail[0]
@@ -971,7 +973,7 @@ Function UpgradeContent() {
                     $pc = $server.Address
                     Write-Host $pc -Fore "Green"
                     Get-PSSession | Format-Table -AutoSize
-                    $session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
+                    $session = Get-PSSession |Where-Object {$_.ComputerName -like "$pc*"}
                     if (!$session) {
                         # Dynamic open PSSession
                         if ($remoteSessionPort -and $remoteSessionSSL) {
@@ -1017,7 +1019,7 @@ Function UpgradeContent() {
     }
     while ($remain)
     Write-Host "===== Upgrade Content Databases DONE ===== $(Get-Date)"
-    $track | group status | Format-Table -AutoSize
+    $track | Group-Object status | Format-Table -AutoSize
     $track | Format-Table -AutoSize
 	
     # GUI
@@ -1031,15 +1033,15 @@ Function UpgradeContent() {
 
 Function ShowMenu($prod) {
     # Choices
-    $csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select -Property @{n = 'MonthInt'; e = {[int]$_.Month}}, *
-    $choices = $csv |? {$_.Product -eq $prod} | sort Year, MonthInt -Desc | select Year, Month -Unique
+    $csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select-Object -Property @{n = 'MonthInt'; e = {[int]$_.Month}}, *
+    $choices = $csv |Where-Object {$_.Product -eq $prod} | Sort-Object Year, MonthInt -Desc | Select-Object Year, Month -Unique
 
     # Menu
     Write-Host "Download CU Media to \media\ - $prod" -Fore "Yellow"
     Write-Host "---------"
     $menu = @()
     $i = 0
-    $choices | % {
+    $choices | ForEach-Object {
         $n = (getMonth($_.Month)) + " " + ($_.Year)
         $menu += $n
         if ($i -eq 0) {
@@ -1228,7 +1230,7 @@ Function StartServiceInst() {
             $si = Get-SPServiceInstance $row.Id
             if ($si) {
                 if ($si.Status -ne "Online") {
-                    $row | ft -a
+                    $row | Format-Table -AutoSize
                     Write-Host "Starting ... " -Fore Green
                     if ($si.TypeName -ne "User Profile Synchronization Service") {
                         # UPS needs password input to start via Central Admin GUI
