@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.92
+	Version			: 0.94
 	Last Modified	: 05-07-2018
 .LINK
 	Source Code
@@ -41,16 +41,13 @@ param (
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseTwo to execute Phase Two after local reboot.')]
     [switch]$phaseTwo,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseThree to execute Phase Three attach and upgrade content.')]
+    [switch]$phaseThree,
 	
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -o -onlineContent to keep content databases online.  Avoids Dismount/Mount.  NOTE - Will substantially increase patching duration for farms with more user content.')]
     [Alias("o")]
     [switch]$onlineContent,
-	
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportTo with email TO address.')]
-    [string]$emailReportTo,
-
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -emailReportServer with email SMTP relay server.')]
-    [string]$emailReportServer,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -remoteSessionPort to open PSSession (remoting) with custom port number.')]
     [string]$remoteSessionPort,
@@ -64,7 +61,7 @@ Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out
 Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.92"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.94"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -364,8 +361,6 @@ Function WaitReboot() {
 }
 
 Function LocalReboot() {
-    # Product install status
-	
     # Create Regkey
     New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name "RunOnce" -ErrorAction SilentlyContinue | Out-Null
     New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "SPPatchify" -Value "PowerShell -executionpolicy unrestricted -file ""$root\SPPatchify.ps1"" -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
@@ -375,10 +370,50 @@ Function LocalReboot() {
     $th = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
     Write-Host "Duration Total Hours: $th" -Fore "Yellow"
     Stop-Transcript
-    Email-Transcript
     Start-Sleep 5
     Restart-Computer -Force
     Exit
+}
+Function LaunchPhaseThree() {
+    # Launch script in new windows for Phase Three - Add Content
+    Start-Process "powershell.exe" -ArgumentList "$root\SPPatchify.ps1 -PhaseThree"
+}
+Function CalcDuration() {
+    Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
+    $totalHours = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
+    Write-Host "Duration Hours: $totalHours" -Fore "Yellow"
+    $c = (Get-SPContentDatabase).Count
+    Write-Host "Content Databases Online: $c"
+	
+    # Add both Phase one and two
+    $regHive = "HKCU:\Software"
+    $regKey = "SPPatchify"
+    if (!$phaseTwo) {
+        # Create Regkey
+        New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
+        New-ItemProperty -Path "$regHive\$regKey" -Name "PhaseOneTotalHours" -Value $totalHours -ErrorAction SilentlyContinue | Out-Null
+    }
+    else {
+        # Read Regkey
+        $key = Get-ItemProperty -Path "$regHive\PhaseOneTotalHours" -ErrorAction SilentlyContinue
+        if ($key) {
+            $totalHours += [double]($key."PhaseOneTotalHours")
+        }
+        Write-Host "TOTAL Hours (Phase One and Two): $totalHours" -Fore "Yellow"
+        Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
+    }
+}
+Function FinalCleanUp() {
+    # Loop - Run Task Scheduler
+    foreach ($server in $global:servers) {
+        $addr = $server.Address
+        $found = Get-ScheduledTask -TaskName "SPPatchify" -ErrorAction SilentlyContinue -CimSession $addr
+        if ($found) {
+            $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
+        }
+    }
+    Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
+    Stop-Transcript
 }
 #endregion
 
@@ -1188,7 +1223,6 @@ Function PatchMenu() {
     if ($sku -eq "PROJ" -and !$files) {
         Write-Host "HALT - have Project Server farm and \media\ folder missing PRJ.  Download correct media and try again." -Fore Red
         Stop-Transcript
-        Email-Transcript
         Exit
     }
 	
@@ -1199,7 +1233,6 @@ Function PatchMenu() {
         $files | Format-Table -AutoSize
         Write-Host "HALT - Multiple EXEs found. Clean up \media\ folder and try again." -Fore Red
         Stop-Transcript
-        Email-Transcript
         Exit
     }
 }
@@ -1387,7 +1420,7 @@ function PreflightCheck() {
     }
 }
 
-function Clear-CacheIni() {
+function ClearCacheIni() {
     Write-Host "Clear CACHE.INI " -Fore Green
     # Get the local farm instance
     $farm = Get-SPServer |Where-Object {($_.Role -ne "Invalid")}
@@ -1406,22 +1439,10 @@ function Clear-CacheIni() {
     Write-Host "Succeess" -Fore Green
 }
 
-function Email-Transcript ($logPath) {
-    # Email transcrit LOG file
-    if ($emailReportServer -and $emailReportTo -and $emailReportFrom) {
-        $msg = New-Object System.Net.Mail.MailMessage
-        $msg.From = "sppatchify@" + $env:userdnsdomain
-        $msg.To.Add($emailReportTo) 
-        $pc = $env:COMPUTERNAME
-        $msg.Subject = "SPPatchify - $pc" 
-        $msg.Body = Get-Content $logPath
-
-        $smtp = New-Object System.Net.Mail.SmtpClient 
-        $smtp.Host = $emailReportServer
-        $smtp.UseDefaultCredentials = $true 
-        $smtp.Send($msg) 
-    }
+function LaunchPhaseThree() {
+    Start-Process "powershell.exe" -ArgumentList "$scriptFile -phaseThree"
 }
+
 #**************************************************************************************
 # Constants
 #**************************************************************************************
@@ -1584,7 +1605,6 @@ function ClearTimerCache($farm) {
             }
         }
     }
-
     Write-Host ""
 }
 
@@ -1609,7 +1629,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.92 last modified 05-07-2018"
+    "SPPatchify version 0.94 last modified 05-07-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1621,7 +1641,7 @@ function Main() {
 
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
-    Write-Host "Servers Online: $($global:servers)"
+    Write-Host "Servers Online: $($global:servers).Count"
     
     # Read IIS Password
     ReadIISPW    
@@ -1631,20 +1651,18 @@ function Main() {
 
     # Prepare \LOG\ folder
     LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
-	
-    WaitReboot
 
     # Core steps
-    if (!$phaseTwo) {
+    if (!$phaseTwo -and !$phaseThree) {
         if ($copyMediaOnly) {
             # Copy media only (switch -C)            
             CopyEXE "Copy"
         }
         else {
-            # Phase One (switch -B) binary EXE
+            # Phase One - Binary EXE
             PatchMenu
             EnablePSRemoting
-            Clear-CacheIni
+            ClearCacheIni
             CopyEXE "Copy"
             SafetyEXE
             SaveServiceInst
@@ -1662,8 +1680,8 @@ function Main() {
             }
         }
     }
-    else {
-        # Phase Two (switch -P) SP Config Wizard
+    # Phase Two - SP Config Wizard
+    if ($phaseTwo) {
         SafetyInstallRequired
         DetectAdmin        
         if (!$onlineContent) {
@@ -1672,6 +1690,11 @@ function Main() {
         ChangeServices $true
         ProductLocal
         RunConfigWizard
+        # Launch new window - Phase Three
+        LaunchPhaseThree
+    }
+    # Phase Three - Add Content
+    if ($phaseThree) {
         if (!$onlineContent) {
             ChangeContent $true
         }
@@ -1681,43 +1704,8 @@ function Main() {
         DisplayCA
     }
 	
-    # Run duration
-    Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
-    $totalHours = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
-    Write-Host "Duration Hours: $totalHours" -Fore "Yellow"
-    $c = (Get-SPContentDatabase).Count
-    Write-Host "Content Databases Online: $c"
-	
-    # Add both Phase one and two
-    $regHive = "HKCU:\Software"
-    $regKey = "SPPatchify"
-    if (!$phaseTwo) {
-        # Create Regkey
-        New-Item -Path $regHive -Name "$regKey" -ErrorAction SilentlyContinue | Out-Null
-        New-ItemProperty -Path "$regHive\$regKey" -Name "PhaseOneTotalHours" -Value $totalHours -ErrorAction SilentlyContinue | Out-Null
-    }
-    else {
-        # Read Regkey
-        $key = Get-ItemProperty -Path "$regHive\PhaseOneTotalHours" -ErrorAction SilentlyContinue
-        if ($key) {
-            $totalHours += [double]($key."PhaseOneTotalHours")
-        }
-        Write-Host "TOTAL Hours (Phase One and Two): $totalHours" -Fore "Yellow"
-        Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
-    }
-	
-    # Cleanup
-    # Loop - Run Task Scheduler
-    foreach ($server in $global:servers) {
-        $addr = $server.Address
-        $found = Get-ScheduledTask -TaskName "SPPatchify" -ErrorAction SilentlyContinue -CimSession $addr
-        if ($found) {
-            $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
-        }
-    }
-    Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
-    Stop-Transcript
-    Email-Transcript
+    # Calculate Duration and Run Cleanup
+    CalcDuration
+    FinalCleanUp
 }
-
 Main
