@@ -692,6 +692,7 @@ Function RunConfigWizard() {
 
 Function ChangeContent($state) {
     Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore "Yellow"
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint")
 
     if (!$state) {
         # Remove content
@@ -728,7 +729,7 @@ Function ChangeContent($state) {
                     }
                     $counter++
             
-                    $wa = Get-SPWebApplication $_.WebApp
+                    $wa = [Microsoft.SharePoint.Administration.SPWebApplication]::Lookup($_.WebApp)
                     if ($wa) {
                         Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
                     }
