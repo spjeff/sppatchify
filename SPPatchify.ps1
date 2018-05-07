@@ -1713,5 +1713,6 @@ function Main() {
     # Calculate Duration and Run Cleanup
     CalcDuration
     FinalCleanUp
+    Write-Host "DONE"
 }
 Main
