@@ -61,7 +61,13 @@ Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out
 Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.94"
+if ($phaseTwo) {
+    $phase = "-phaseTwo"
+}
+if ($phaseThree) {
+    $phase = "-phaseThree"
+}
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.94 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1126,7 +1132,12 @@ function GetMonthInt($name) {
         }
     }
 }
-
+function PatchRemoval() {
+    # Remove patch media
+    $files = Get-ChildItem "$root\media\*.exe" 
+    $files | Format-Table -AutoSize
+    $files | Remove-Item -Confirm:$false -Force
+}
 function PatchMenu() {
     # Ensure folder
     mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
@@ -1459,16 +1470,6 @@ Set-Variable timerServiceInstanceName -option Constant -value "Microsoft SharePo
 # Functions
 #**************************************************************************************
 #<summary>
-# Loads the SharePoint Powershell Snapin.
-#</summary>
-function Load-SharePoint-Powershell {
-    If ((Get-PsSnapin |Where-Object {$_.Name -eq "Microsoft.SharePoint.PowerShell"}) -eq $null) {
-        Write-Host -ForegroundColor White " - Loading SharePoint Powershell Snapin"
-        Add-PsSnapin Microsoft.SharePoint.PowerShell -ErrorAction Stop
-    }
-}
-
-#<summary>
 # Stops the SharePoint Timer Service on each server in the SharePoint Farm.
 #</summary>
 #<param name="$farm">The SharePoint farm object.</param>
@@ -1617,6 +1618,7 @@ function ClearTimerCache($farm) {
 function Main() {
     # Download media
     if ($downloadMediaOnly) {
+        PatchRemoval
         PatchMenu
         Exit
     }
