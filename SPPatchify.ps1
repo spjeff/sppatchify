@@ -88,19 +88,25 @@ Function CopyEXE($action) {
     foreach ($server in $global:servers) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
-
-            # Dynamic open PSSesion
-            $cmd = "`$global:s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
-            if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-            if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-            $sb = [Scriptblock]::Create($cmd)
-            Invoke-Command -ScriptBlock $sb
+            # Dynamic open PSSession
+            if ($remoteSessionPort -and $remoteSessionSSL) {
+                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+            }
+            elseif ($remoteSessionPort) {
+                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+            }
+            elseif ($remoteSessionSSL) {
+                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+            }
+            else {
+                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+            }
 
             # Dynamic remote command
             $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0"
             Write-Host $cmd -Fore Yellow
             $sb = [Scriptblock]::Create($cmd)
-            Invoke-Command -ScriptBlock $sb -Session $global:s -AsJob
+            Invoke-Command -ScriptBlock $sb -Session $remote -AsJob
         }
     }
 
@@ -212,7 +218,7 @@ Function RunEXE() {
         foreach ($server in $global:servers) {
             # Local PC - No reboot
             if ($server.Address -eq $env:computername) {
-                $params = $params.Replace("forcerestart","norestart")
+                $params = $params.Replace("forcerestart", "norestart")
             }
 
             # Remove SCHTASK if found
@@ -333,11 +339,14 @@ Function WaitReboot() {
                 # Dynamic open PSSession
                 if ($remoteSessionPort -and $remoteSessionSSL) {
                     $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
-                } elseif ($remoteSessionPort) {
+                }
+                elseif ($remoteSessionPort) {
                     $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
-                } elseif ($remoteSessionSSL) {
+                }
+                elseif ($remoteSessionSSL) {
                     $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
-                } else {
+                }
+                else {
                     $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
                 }
 
@@ -421,13 +430,20 @@ Function LoopRemotePatch($msg, $cmd, $params) {
 		
         # Remote Posh
         Write-Host ">> invoke on $addr" -Fore "Green"
-        
-        # Dynamic open PSSesion
-        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-        $sb = [Scriptblock]::Create($cmd)
-        Invoke-Command -ScriptBlock $sb
+		
+        # Dynamic open PSSession
+        if ($remoteSessionPort -and $remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+        }
+        elseif ($remoteSessionPort) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+        }
+        elseif ($remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+        }
+        else {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+        }
 
         # Invoke
         Start-Sleep 3
@@ -511,11 +527,18 @@ Function LoopRemoteCmd($msg, $cmd) {
         Write-Host ">> invoke on $addr" -Fore "Green"
         
         # Dynamic open PSSesion
-        $sessionCmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-        if ($remoteSessionPort) { $sessionCmd += " -Port $remoteSessionPort"}
-        if ($remoteSessionSSL) { $sessionCmd += " -UseSSL"}
-        $sessionSb = [Scriptblock]::Create($sessionCmd)
-        Invoke-Command -ScriptBlock $sessionSb
+        if ($remoteSessionPort -and $remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+        }
+        elseif ($remoteSessionPort) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+        }
+        elseif ($remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+        }
+        else {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+        }
 
         # Merge script block array
         $mergeCmd = ""
@@ -524,7 +547,8 @@ Function LoopRemoteCmd($msg, $cmd) {
                 $mergeSb += $s.ToString() + "`n"
             }
             $mergeSb = [Scriptblock]::Create($mergeCmd)
-        } else {
+        }
+        else {
             $mergeSb = $sb
         }
         
@@ -882,11 +906,19 @@ Function UpgradeContent() {
         $addr = $server.Address
         
         # Dynamic open PSSesion
-        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-        $sb = [Scriptblock]::Create($cmd)
-        Invoke-Command -ScriptBlock $sb
+        if ($remoteSessionPort -and $remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+        }
+        elseif ($remoteSessionPort) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+        }
+        elseif ($remoteSessionSSL) {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+        }
+        else {
+            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+        }
+        Invoke-Command -ScriptBlock $sb -Session $remote
     }
 
     # Monitor and Run loop
@@ -943,13 +975,19 @@ Function UpgradeContent() {
                     Get-PSSession | Format-Table -AutoSize
                     $session = Get-PSSession |? {$_.ComputerName -like "$pc*"}
                     if (!$session) {
-                        
-                        # Dynamic open PSSesion
-                        $cmd = "`$session = New-PSSession -ComputerName `$pc -Credential `$global:cred -Authentication Negotiate -ErrorAction SilentlyContinue"
-                        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-                        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-                        $sb = [Scriptblock]::Create($cmd)
-                        Invoke-Command -ScriptBlock $sb
+                        # Dynamic open PSSession
+                        if ($remoteSessionPort -and $remoteSessionSSL) {
+                            $session = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+                        }
+                        elseif ($remoteSessionPort) {
+                            $session = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+                        }
+                        elseif ($remoteSessionSSL) {
+                            $session = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+                        }
+                        else {
+                            $session = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+                        }
                     }
                     $result = Invoke-Command $remoteCmd -Session $session -AsJob
 					
@@ -1321,13 +1359,19 @@ function PreflightCheck() {
         foreach ($server in $global:servers) {
             $addr = $server.Address
             if ($addr -ne $env:computername) {
-                
-                # Dynamic open PSSesion
-                $cmd = "`$s = New-PSSession -ComputerName `$env:computername -Credential `$global:cred -Authentication CredSSP"
-                if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-                if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-                $sb = [Scriptblock]::Create($cmd)
-                Invoke-Command -ScriptBlock $sb
+				            # Dynamic open PSSession
+                if ($remoteSessionPort -and $remoteSessionSSL) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+                }
+                elseif ($remoteSessionPort) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+                }
+                elseif ($remoteSessionSSL) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+                }
+                else {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+                }
             }
         }
         Write-Host "Succeess" -Fore Green
@@ -1583,7 +1627,7 @@ function Main() {
     # Prepare \LOG\ folder
     LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
 	
-	WaitReboot
+    WaitReboot
 
     # Core steps
     if (!$phaseTwo) {
