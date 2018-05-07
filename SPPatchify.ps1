@@ -208,14 +208,21 @@ Function RunEXE() {
         $params = "/passive /forcerestart /log:""$root\log\$name.log"""
         $taskName = "SPPatchify"
 
-
         # Loop - Run Task Scheduler
         foreach ($server in $global:servers) {
+            # Local PC - No reboot
+            if ($server.Address -eq $env:computername) {
+                $params = $params.Replace("forcerestart","norestart")
+            }
+
+            # Remove SCHTASK if found
             $addr = $server.Address
             $found = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue -CimSession $addr
             if ($found) {
                 $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
             }
+
+            # New SCHTASK parameters
             $user = $global:username
             $pw = $global:userpass
             $folder = Split-Path $f
@@ -223,6 +230,7 @@ Function RunEXE() {
             $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType Password
             $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
 
+            # Create SCHTASK
             Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
             Register-ScheduledTask -TaskName $taskName -InputObject $task -Password $pw -User $user -CimSession $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
@@ -244,6 +252,7 @@ Function RunEXE() {
     if ($ver -eq 16) {
         foreach ($server in $global:servers) {
             if ($server.Address -ne $env:computername) {
+                Write-Host "Reboot $($server.Address)" -Fore Yellow
                 Restart-Computer -ComputerName $server.Address
             }
         }
@@ -311,6 +320,7 @@ Function WaitReboot() {
     foreach ($server in $global:servers) {
         # Progress
         $addr = $server.Address
+        Write-Host $addr -Fore Yellow
         if ($addr -ne $env:COMPUTERNAME) {
             $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
             if ($prct) {
