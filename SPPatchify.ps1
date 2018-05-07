@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.91
-	Last Modified	: 05-06-2018
+	Version			: 0.92
+	Last Modified	: 05-07-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -64,7 +64,7 @@ Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out
 Import-Module WebAdministration -ErrorAction SilentlyContinue | Out-Null
 
 # Version
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.91"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.92"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1322,30 +1322,30 @@ function PreflightCheck() {
             }
         }
         Write-Host "Succeess" -Fore Green
-
-
-        Write-Host "Clear CACHE.INI " -Fore Green
-        # Get the local farm instance
-        $farm = Get-SPServer |? {($_.Role -ne "Invalid")}
-
-        # Stop the SharePoint Timer Service on each server in the farm
-        StopSharePointTimerServicesInFarm $farm
-
-        # Delete all xml files from cache config folder on each server in the farm
-        DeleteXmlFilesFromConfigCache $farm
-
-        # Clear the timer cache on each server in the farm
-        ClearTimerCache $farm
-
-        # Start the SharePoint Timer Service on each server in the farm
-        StartSharePointTimerServicesInFarm $farm
-        Write-Host "Succeess" -Fore Green
-
         return $true
     }
     catch {
         throw 'Not able to connect to one or more computers in the farm. Please make sure you have run run Enable-PSRemoting and Enable-WSManCredSSP -Role Server'
     }
+}
+
+function Clear-CacheIni() {
+    Write-Host "Clear CACHE.INI " -Fore Green
+    # Get the local farm instance
+    $farm = Get-SPServer |? {($_.Role -ne "Invalid")}
+
+    # Stop the SharePoint Timer Service on each server in the farm
+    StopSharePointTimerServicesInFarm $farm
+
+    # Delete all xml files from cache config folder on each server in the farm
+    DeleteXmlFilesFromConfigCache $farm
+
+    # Clear the timer cache on each server in the farm
+    ClearTimerCache $farm
+
+    # Start the SharePoint Timer Service on each server in the farm
+    StartSharePointTimerServicesInFarm $farm
+    Write-Host "Succeess" -Fore Green
 }
 
 function Email-Transcript ($logPath) {
@@ -1551,7 +1551,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.91 last modified 05-06-2018"
+    "SPPatchify version 0.92 last modified 05-07-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1585,7 +1585,8 @@ function Main() {
         else {
             # Phase One (switch -B) binary EXE
             PatchMenu
-            EnablePSRemoting            
+            EnablePSRemoting
+            Clear-CacheIni
             CopyEXE "Copy"
             SafetyEXE
             SaveServiceInst
