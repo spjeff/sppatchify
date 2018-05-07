@@ -683,7 +683,11 @@ Function RunConfigWizard() {
     LoopRemoteCmd "Run Config Wizard on " @($shared, $wiz)
 
     # Reset PowerShell window
-    powershell -nologo
+    $f = Get-SPFarm
+    $f.Uncache()
+    [System.GC]::Collect()
+    Remove-PSSnapin Microsoft.SharePoint.PowerShell
+    Add-PSSnapin Microsoft.SharePoint.PowerShell
 }
 
 Function ChangeContent($state) {
