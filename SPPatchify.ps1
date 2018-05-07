@@ -511,11 +511,11 @@ Function LoopRemoteCmd($msg, $cmd) {
         Write-Host ">> invoke on $addr" -Fore "Green"
         
         # Dynamic open PSSesion
-        $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-        if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-        if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-        $sb = [Scriptblock]::Create($cmd)
-        Invoke-Command -ScriptBlock $sb
+        $sessionCmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
+        if ($remoteSessionPort) { $sessionCmd += " -Port $remoteSessionPort"}
+        if ($remoteSessionSSL) { $sessionCmd += " -UseSSL"}
+        $sessionSb = [Scriptblock]::Create($sessionCmd)
+        Invoke-Command -ScriptBlock $sessionSb
 
         # Invoke
         Start-Sleep 3
@@ -640,7 +640,7 @@ Function RunConfigWizard() {
     $b2b = {
         $file = $psconfig.replace("psconfig.exe", "psconfigb2b.cmd")
         if (!(Test-Path $file)) {
-            "psconfig.exe $options" | Out-File $file -Force
+            "psconfig.exe -cmd upgrade -inplace b2b -force" | Out-File $file -Force
         }
     }
     LoopRemoteCmd "Save B2B shortcut on " @($shared, $b2b)
