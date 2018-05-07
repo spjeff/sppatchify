@@ -541,15 +541,13 @@ Function LoopRemoteCmd($msg, $cmd) {
         }
 
         # Merge script block array
+        $mergeSb = $sb
         $mergeCmd = ""
         if ($sb -is [array]) {
             foreach ($s in $sb) {
-                $mergeSb += $s.ToString() + "`n"
+                $mergeCmd += $s.ToString() + "`n"
             }
             $mergeSb = [Scriptblock]::Create($mergeCmd)
-        }
-        else {
-            $mergeSb = $sb
         }
         
         # Invoke
