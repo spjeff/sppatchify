@@ -620,7 +620,7 @@ Function ChangeServices($state) {
                     Start-Service $_ -ErrorAction SilentlyContinue
                 }
             }
-            @("OSearch$ver", "SPSearchHostController") | % {
+            @("OSearch$ver", "SPSearchHostController") | ForEach-Object {
                 Start-Service $_ -ErrorAction SilentlyContinue
             }
             Start-Process 'iisreset.exe' -ArgumentList '/start' -Wait -PassThru -NoNewWindow | Out-Null
@@ -630,7 +630,7 @@ Function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | % {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
@@ -693,7 +693,7 @@ Function ChangeContent($state) {
         # Remove content
         $dbs = Get-SPContentDatabase
         if ($dbs) {
-            $dbs | ForEach-Object {$wa = $_.WebApplication.Url; $_ | select Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
+            $dbs | ForEach-Object {$wa = $_.WebApplication.Url; $_ | Select-Object Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
             $dbs | ForEach-Object {
                 "$($_.Name),$($_.NormalizedDataSource)"
                 Dismount-SPContentDatabase $_ -Confirm:$false
@@ -702,7 +702,7 @@ Function ChangeContent($state) {
     }
     else {
         # Add content
-        $files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort LastAccessTime -Desc
+        $files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort-Object LastAccessTime -Desc
         if ($files -is [Array]) {
             $files = $files[0]
         }
@@ -782,7 +782,7 @@ Function ReadIISPW {
     }
     else {
         # PowerShell ver 3.0+ WMI technique
-        $appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | select WAMUserName, WAMUserPass
+        $appPools = Get-CimInstance -Namespace "root/MicrosoftIISv2" -ClassName "IIsApplicationPoolSetting" -Property Name, WAMUserName, WAMUserPass | Select-Object WAMUserName, WAMUserPass
         foreach ($pool in $appPools) {	
             if ($pool.WAMUserName -like "*$user") {
                 Write-Host "Found - "$pool.WAMUserName
@@ -855,7 +855,7 @@ Function IISStart() {
 
         # W3WP
         Start-Service w3svc | Out-Null
-        Get-ChildItem "IIS:\AppPools\" | % {$n = $_.Name; Start-WebAppPool $n | Out-Null}
+        Get-ChildItem "IIS:\AppPools\" | ForEach-Object {$n = $_.Name; Start-WebAppPool $n | Out-Null}
         Get-WebSite | Start-WebSite | Out-Null
     }
     LoopRemoteCmd "Start IIS on " $sb
@@ -871,7 +871,7 @@ Function ProductLocal() {
 	
     # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
-    (Get-SPProduct).Servers | Select Servername, InstallStatus | Sort Servername | ft -a
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
 }
 
 Function UpgradeContent() {
@@ -924,7 +924,7 @@ Function UpgradeContent() {
     # Monitor and Run loop
     do {
         # Get latest PID status
-        $active = $track |? {$_.Status -eq "InProgress"}
+        $active = $track |Where-Object {$_.Status -eq "InProgress"}
         foreach ($db in $active) {
             # Monitor remote server job
             if ($db.JID) {
@@ -997,7 +997,7 @@ Function UpgradeContent() {
                 }
 				
                 # Progress
-                $counter = ($track |? {$_.Status -eq "Completed"}).Count
+                $counter = ($track |Where-Object {$_.Status -eq "Completed"}).Count
                 $prct = 0
                 if ($track) {
                     $prct = [Math]::Round(($counter / $track.Count) * 100)
@@ -1015,7 +1015,7 @@ Function UpgradeContent() {
         }
 
         # Latest counter
-        $remain = $track |? {$_.status -ne "Completed" -and $_.status -ne "Failed"}
+        $remain = $track |Where-Object {$_.status -ne "Completed" -and $_.status -ne "Failed"}
     }
     while ($remain)
     Write-Host "===== Upgrade Content Databases DONE ===== $(Get-Date)"
@@ -1079,7 +1079,7 @@ Function GetMonth($mo) {
 
 Function GetMonthInt($name) {
     # Convert three letter month name to integer
-    1 .. 12 | % {
+    1 .. 12 | ForEach-Object {
         if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
             return $_
         }
@@ -1123,7 +1123,7 @@ Function PatchMenu() {
         $farm = Get-SPFarm -ErrorAction SilentlyContinue
         if ($farm) {
             $ver = $farm.BuildVersion.Major
-            $sppl = (Get-SPProduct -Local) |? {$_.ProductName -like "*Project*"}
+            $sppl = (Get-SPProduct -Local) |Where-Object {$_.ProductName -like "*Project*"}
             if ($sppl) {
                 if ($ver -ne 16) {
                     $sku = "PROJ"
@@ -1148,7 +1148,7 @@ Function PatchMenu() {
     Write-Host "SELECTED = $($global:selmonth)" -Fore "Yellow"
     $year = $global:selmonth.Split(" ")[1]
     $month = GetMonthInt $global:selmonth.Split(" ")[0]
-    $patchFiles = $csv |? {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
+    $patchFiles = $csv |Where-Object {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
     $patchFiles | Format-Table -Auto
 	
     # Download patch files
@@ -1218,7 +1218,7 @@ Function DetectAdmin() {
 
 Function SaveServiceInst() {
     # Save config to CSV
-    $sos = Get-SPServiceInstance |? {$_.Status -eq "Online"} | Select Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
+    $sos = Get-SPServiceInstance |Where-Object {$_.Status -eq "Online"} | Select-Object Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
     $sos | Export-Csv "$root\log\sos-before.csv" -Force -NoTypeInformation
 }
 
@@ -1385,7 +1385,7 @@ function PreflightCheck() {
 function Clear-CacheIni() {
     Write-Host "Clear CACHE.INI " -Fore Green
     # Get the local farm instance
-    $farm = Get-SPServer |? {($_.Role -ne "Invalid")}
+    $farm = Get-SPServer |Where-Object {($_.Role -ne "Invalid")}
 
     # Stop the SharePoint Timer Service on each server in the farm
     StopSharePointTimerServicesInFarm $farm
@@ -1430,7 +1430,7 @@ Set-Variable timerServiceInstanceName -option Constant -value "Microsoft SharePo
 # Loads the SharePoint Powershell Snapin.
 #</summary>
 Function Load-SharePoint-Powershell {
-    If ((Get-PsSnapin |? {$_.Name -eq "Microsoft.SharePoint.PowerShell"}) -eq $null) {
+    If ((Get-PsSnapin |Where-Object {$_.Name -eq "Microsoft.SharePoint.PowerShell"}) -eq $null) {
         Write-Host -ForegroundColor White " - Loading SharePoint Powershell Snapin"
         Add-PsSnapin Microsoft.SharePoint.PowerShell -ErrorAction Stop
     }
@@ -1615,7 +1615,7 @@ function Main() {
     Write-Host "Content Databases Online: $((Get-SPContentDatabase).Count)"
 
     # Local farm servers
-    $global:servers = Get-SPServer |? {$_.Role -ne "Invalid"} | sort Address
+    $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
     Write-Host "Servers Online: $($global:servers)"
     
     # Read IIS Password
