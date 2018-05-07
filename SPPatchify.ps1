@@ -331,11 +331,16 @@ Function WaitReboot() {
             # Remote PowerShell session
             do {
                 # Dynamic open PSSession
-                $cmd = "`$remote = New-PSSession -ComputerName `$addr -Credential `$global:cred -Authentication CredSSP -ErrorAction SilentlyContinue"
-                if ($remoteSessionPort) { $cmd += " -Port $remoteSessionPort"}
-                if ($remoteSessionSSL) { $cmd += " -UseSSL"}
-                $sb = [Scriptblock]::Create($cmd)
-                Invoke-Command -ScriptBlock $sb
+                if ($remoteSessionPort -and $remoteSessionSSL) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+                } elseif ($remoteSessionPort) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+                } elseif ($remoteSessionSSL) {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+                } else {
+                    $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+                }
+
 
                 # Display
                 Write-Host "."  -NoNewLine
@@ -1568,6 +1573,8 @@ function Main() {
 
     # Prepare \LOG\ folder
     LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
+	
+	WaitReboot
 
     # Core steps
     if (!$phaseTwo) {
