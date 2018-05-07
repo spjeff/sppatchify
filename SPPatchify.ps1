@@ -74,7 +74,7 @@ if ($char[1] -eq ':') {
 $remoteRoot = -join $char
 
 #region binary EXE
-Function CopyEXE($action) {
+function CopyEXE($action) {
     Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
 	
     # Clear old session
@@ -152,7 +152,7 @@ Function CopyEXE($action) {
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
-Function SafetyInstallRequired() {
+function SafetyInstallRequired() {
     # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
@@ -165,7 +165,7 @@ Function SafetyInstallRequired() {
     }
 }
 
-Function SafetyEXE() {
+function SafetyEXE() {
     Write-Host "===== SafetyEXE ===== $(Get-Date)" -Fore "Yellow"
 
     # Count number of files.   Must be 3 for SP2013 (major ver 15)
@@ -189,7 +189,7 @@ Function SafetyEXE() {
     }
 }
 
-Function RunEXE() {
+function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
     $coll = newStatus("RunEXE")
     displayStatus $coll
@@ -262,7 +262,7 @@ Function RunEXE() {
     }
 }
 
-Function WaitEXE($patchName) {
+function WaitEXE($patchName) {
     Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore "Yellow"
 	
     # Wait for reboot
@@ -308,7 +308,7 @@ Function WaitEXE($patchName) {
     }
 }
 
-Function WaitReboot() {
+function WaitReboot() {
     Write-Host "`n===== WaitReboot ===== $(Get-Date)" -Fore "Yellow"
 	
     # Wait for farm peer machines to reboot
@@ -360,7 +360,7 @@ Function WaitReboot() {
     Get-PSSession | Remove-PSSession
 }
 
-Function LocalReboot() {
+function LocalReboot() {
     # Create Regkey
     New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\" -Name "RunOnce" -ErrorAction SilentlyContinue | Out-Null
     New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "SPPatchify" -Value "PowerShell -executionpolicy unrestricted -file ""$root\SPPatchify.ps1"" -PhaseTwo" -ErrorAction SilentlyContinue | Out-Null
@@ -374,11 +374,11 @@ Function LocalReboot() {
     Restart-Computer -Force
     Exit
 }
-Function LaunchPhaseThree() {
+function LaunchPhaseThree() {
     # Launch script in new windows for Phase Three - Add Content
     Start-Process "powershell.exe" -ArgumentList "$root\SPPatchify.ps1 -PhaseThree"
 }
-Function CalcDuration() {
+function CalcDuration() {
     Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
     $totalHours = [Math]::Round(((Get-Date) - $start).TotalHours, 2)
     Write-Host "Duration Hours: $totalHours" -Fore "Yellow"
@@ -403,7 +403,7 @@ Function CalcDuration() {
         Remove-Item -Path "$regHive\$regKey" -ErrorAction SilentlyContinue | Out-Null
     }
 }
-Function FinalCleanUp() {
+function FinalCleanUp() {
     # Loop - Run Task Scheduler
     foreach ($server in $global:servers) {
         $addr = $server.Address
@@ -414,11 +414,12 @@ Function FinalCleanUp() {
     }
     Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
     Stop-Transcript
+    CloseIE
 }
 #endregion
 
 #region SP Config Wizard
-Function LoopRemotePatch($msg, $cmd, $params) {
+function LoopRemotePatch($msg, $cmd, $params) {
     if (!$cmd) {
         return
     }
@@ -498,7 +499,7 @@ Function LoopRemotePatch($msg, $cmd, $params) {
     }
     Write-Progress -Activity "Completed $(Get-Date)" -Completed	
 }
-Function LoopRemoteCmd($msg, $cmd) {
+function LoopRemoteCmd($msg, $cmd) {
     if (!$cmd) {
         return
     }
@@ -602,7 +603,7 @@ Function LoopRemoteCmd($msg, $cmd) {
     Write-Progress -Activity "Completed $(Get-Date)" -Completed	
 }
 
-Function ChangeDC() {
+function ChangeDC() {
     Write-Host "===== ChangeDC OFF ===== $(Get-Date)" -Fore "Yellow"
 
     # Distributed Cache
@@ -641,7 +642,7 @@ Function ChangeDC() {
     LoopRemoteCmd "Stop Distributed Cache on " $sb
 }
 
-Function ChangeServices($state) {
+function ChangeServices($state) {
     Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore "Yellow"
     $ver = (Get-SPFarm).BuildVersion.Major
 	
@@ -694,7 +695,7 @@ Function ChangeServices($state) {
     LoopRemoteCmd "$action services on " $sb
 }
 
-Function RunConfigWizard() {
+function RunConfigWizard() {
     # Shared
     $shared = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -725,7 +726,7 @@ Function RunConfigWizard() {
     Add-PSSnapin Microsoft.SharePoint.PowerShell
 }
 
-Function ChangeContent($state) {
+function ChangeContent($state) {
     Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore "Yellow"
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint")
 
@@ -779,7 +780,7 @@ Function ChangeContent($state) {
 #endregion
 
 #region general
-Function EnablePSRemoting() {
+function EnablePSRemoting() {
     $ssp = Get-WSManCredSSP
     if ($ssp[0] -match "not configured to allow delegating") {
         # Enable remote PowerShell over CredSSP authentication
@@ -788,7 +789,7 @@ Function EnablePSRemoting() {
     }
 }
 
-Function ReadIISPW {
+function ReadIISPW {
     Write-Host "===== Read IIS PW ===== $(Get-Date)" -Fore "Yellow"
 
     # Current user (ex: Farm Account)
@@ -846,7 +847,7 @@ Function ReadIISPW {
     $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user", $sec
 }
 
-Function DisplayCA() {
+function DisplayCA() {
     # Version DLL File
     $sb = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null;
@@ -863,7 +864,7 @@ Function DisplayCA() {
     $pages = @("PatchStatus.aspx", "UpgradeStatus.aspx", "FarmServers.aspx")
     $pages | ForEach-Object {Start-Process ($ca.Url + "_admin/" + $_)}
 }
-Function DisplayVersion() {
+function DisplayVersion() {
     # Version Max Patch
     $maxv = 0
     $f = Get-SPFarm
@@ -881,7 +882,7 @@ Function DisplayVersion() {
     Write-Host "Max Product = $maxv"
     Write-Host "Farm Build  = $($f.BuildVersion)"
 }
-Function IISStart() {
+function IISStart() {
     # Start IIS pools and sites
     $sb = {
         Import-Module WebAdministration
@@ -901,7 +902,7 @@ Function IISStart() {
     LoopRemoteCmd "Start IIS on " $sb
 }
 
-Function ProductLocal() {
+function ProductLocal() {
     # Sync local SKU binary to config DB
     $sb = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -914,7 +915,7 @@ Function ProductLocal() {
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
 }
 
-Function UpgradeContent() {
+function UpgradeContent() {
     Write-Host "===== Upgrade Content Databases ===== $(Get-Date)" -Fore "Yellow"
 	
     # Tracking table - assign DB to server
@@ -1071,7 +1072,7 @@ Function UpgradeContent() {
     Get-Job | Remove-Job
 }
 
-Function ShowMenu($prod) {
+function ShowMenu($prod) {
     # Choices
     $csv = Import-Csv "$root\SPPatchify-Download-CU.csv" | Select-Object -Property @{n = 'MonthInt'; e = {[int]$_.Month}}, *
     $choices = $csv |Where-Object {$_.Product -eq $prod} | Sort-Object Year, MonthInt -Desc | Select-Object Year, Month -Unique
@@ -1106,7 +1107,7 @@ Function ShowMenu($prod) {
     $global:selmonth = $sel
 } 
 
-Function GetMonth($mo) {
+function GetMonth($mo) {
     # Convert integer to three letter month name
     try {
         $mo = (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($mo)
@@ -1117,7 +1118,7 @@ Function GetMonth($mo) {
     return $mo
 }
 
-Function GetMonthInt($name) {
+function GetMonthInt($name) {
     # Convert three letter month name to integer
     1 .. 12 | ForEach-Object {
         if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
@@ -1126,7 +1127,7 @@ Function GetMonthInt($name) {
     }
 }
 
-Function PatchMenu() {
+function PatchMenu() {
     # Ensure folder
     mkdir "$root\media" -ErrorAction SilentlyContinue | Out-Null
 
@@ -1237,7 +1238,7 @@ Function PatchMenu() {
     }
 }
 
-Function DetectAdmin() {
+function DetectAdmin() {
     # Are we running as local Administrator
     $wid = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $prp = New-Object System.Security.Principal.WindowsPrincipal($wid)
@@ -1254,13 +1255,13 @@ Function DetectAdmin() {
     }
 }
 
-Function SaveServiceInst() {
+function SaveServiceInst() {
     # Save config to CSV
     $sos = Get-SPServiceInstance |Where-Object {$_.Status -eq "Online"} | Select-Object Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
     $sos | Export-Csv "$root\log\sos-before.csv" -Force -NoTypeInformation
 }
 
-Function StartServiceInst() {
+function StartServiceInst() {
     # Restore config from CSV
     $sos = Import-Csv "$root\log\sos-before.csv"
     if ($sos) {
@@ -1373,11 +1374,11 @@ function displayStatus($coll, $px, $msg, $msp, $stats) {
     launchIE $file
 }
 
-function launchIE($file) {
-    # Web browser
+function LaunchIE($file) {
+    # Navigate Web browser
     $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
     if (!$ieproc) {
-        $global:ie = new-object -comobject InternetExplorer.Application
+        $global:ie = New-Object -COMObject InternetExplorer.Application
         $global:ie.visible = $true
         $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
         $global:HWND = $global:ie.HWND
@@ -1387,6 +1388,11 @@ function launchIE($file) {
     }
     catch {
     }
+}
+function CloseIE() {
+    # Close Web browser
+    $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
+    $ieproc | Stop-Process
 }
 #endregion
 
@@ -1455,7 +1461,7 @@ Set-Variable timerServiceInstanceName -option Constant -value "Microsoft SharePo
 #<summary>
 # Loads the SharePoint Powershell Snapin.
 #</summary>
-Function Load-SharePoint-Powershell {
+function Load-SharePoint-Powershell {
     If ((Get-PsSnapin |Where-Object {$_.Name -eq "Microsoft.SharePoint.PowerShell"}) -eq $null) {
         Write-Host -ForegroundColor White " - Loading SharePoint Powershell Snapin"
         Add-PsSnapin Microsoft.SharePoint.PowerShell -ErrorAction Stop
