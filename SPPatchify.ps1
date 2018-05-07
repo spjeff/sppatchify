@@ -517,13 +517,20 @@ Function LoopRemoteCmd($msg, $cmd) {
         $sessionSb = [Scriptblock]::Create($sessionCmd)
         Invoke-Command -ScriptBlock $sessionSb
 
+        # Merge script block array
+        $scriptCmd = ""
+        if ($sb -is [array]) {
+            foreach ($s in $sb) {
+                $scriptCmd += $s.ToString() + "`n"
+            }
+        }
+        $scriptSb = [Scriptblock]::Create($scriptCmd)
+
         # Invoke
         Start-Sleep 3
-        foreach ($s in $sb) {
-            Write-Host $s.ToString()
-            if ($remote) {
-                Invoke-Command -Session $remote -ScriptBlock $s
-            }
+        if ($remote) {
+            Write-Host $scriptSb.ToString()
+            Invoke-Command -Session $remote -ScriptBlock $scriptSb
         }
         Write-Host "<< complete on $addr" -Fore "Green"
 		
