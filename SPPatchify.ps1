@@ -91,25 +91,10 @@ function CopyEXE($action) {
     foreach ($server in $global:servers) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
-            # Dynamic open PSSession
-            if ($remoteSessionPort -and $remoteSessionSSL) {
-                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
-            }
-            elseif ($remoteSessionPort) {
-                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
-            }
-            elseif ($remoteSessionSSL) {
-                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
-            }
-            else {
-                $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
-            }
-
-            # Dynamic remote command
-            $cmd = "#$addr;`n`$dest = '\\$addr\$remoteRoot\media';`nmkdir `$dest -Force -ErrorAction SilentlyContinue | Out-Null;`nROBOCOPY '$root\media' `$dest /Z /W:0 /R:0"
-            Write-Host $cmd -Fore Yellow
-            $sb = [Scriptblock]::Create($cmd)
-            Invoke-Command -ScriptBlock $sb -Session $remote -AsJob
+            # Dynamic command
+			$dest = "\\$addr\$remoteRoot\media"
+			mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null;
+            ROBOCOPY ""$root\media"" ""$dest"" /Z /MIR /W:0 /R:0
         }
     }
 
@@ -886,6 +871,8 @@ function DisplayVersion() {
             $maxv = $v
         }
     }
+
+    # Display data
     if ($maxv -eq $f.BuildVersion) {
         Write-Host "Max Product = $maxv" -Fore Green
         Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Green
