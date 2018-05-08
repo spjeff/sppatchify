@@ -1268,7 +1268,7 @@ function DetectAdmin() {
         (Get-Host).UI.RawUI.Backgroundcolor = "DarkRed"
         Clear-Host
         Write-Host "===== SPPatchify - Not Running as Administrator =====`nStarting an elevated PowerShell window...`n"
-        $arguments = "& '" + $rootCmd + "' -p"
+        $arguments = "& '" + $rootCmd + "' -phaseTwo"
         $arguments
         Start-Process powershell -Verb runAs -ArgumentList $arguments
         Break
