@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.94
-	Last Modified	: 05-07-2018
+	Version			: 0.95
+	Last Modified	: 05-08-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -67,7 +67,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.94 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.95 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -886,8 +886,13 @@ function DisplayVersion() {
             $maxv = $v
         }
     }
-    Write-Host "Max Product = $maxv"
-    Write-Host "Farm Build  = $($f.BuildVersion)"
+    if ($maxv -eq $f.BuildVersion) {
+        Write-Host "Max Product = $maxv" -Fore Green
+        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Green
+    } else {
+        Write-Host "Max Product = $maxv" -Fore Yellow
+        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Yellow
+    }
 
     # Server status table
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
@@ -1641,7 +1646,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.94 last modified 05-07-2018"
+    "SPPatchify version 0.95 last modified 05-08-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
