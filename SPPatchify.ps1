@@ -418,7 +418,7 @@ function FinalCleanUp() {
             $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
         }
     }
-    Remove-Item "$root\sppatchify-status.html" -Force -ErrorAction SilentlyContinue | Out-Null
+    Remove-Item "$root\sppatchify-status.html" -Confirm:$false -Force -ErrorAction SilentlyContinue | Out-Null
     Stop-Transcript
     CloseIE
 }
