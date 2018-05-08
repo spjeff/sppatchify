@@ -528,6 +528,7 @@ function LoopRemoteCmd($msg, $cmd) {
     # Loop servers
     $counter = 0
     foreach ($server in $global:servers) {
+        Write-Host $server.Address -Fore Yellow
 
         # Script block
         if ($cmd.GetType().Name -eq "String") {
@@ -688,6 +689,8 @@ function ChangeServices($state) {
 }
 
 function RunConfigWizard() {
+    Write-Host "===== RunConfigWizard =====" -Fore Yellow
+
     # Shared
     $shared = {
         Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
@@ -709,18 +712,11 @@ function RunConfigWizard() {
         & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources" -cmd "services" -install
     }
     LoopRemoteCmd "Run Config Wizard on " @($shared, $wiz)
-
-    # Reset PowerShell window
-    $f = Get-SPFarm
-    $f.Uncache()
-    [System.GC]::Collect()
-    Remove-PSSnapin Microsoft.SharePoint.PowerShell
-    Add-PSSnapin Microsoft.SharePoint.PowerShell
 }
 
 function ChangeContent($state) {
     Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore "Yellow"
-    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint")
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint") | Out-Null
 
     if (!$state) {
         # Remove content
