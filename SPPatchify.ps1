@@ -509,6 +509,7 @@ function LoopRemoteCmd($msg, $cmd) {
     if (!$cmd) {
         return
     }
+
     # Clean up
     Get-PSSession | Remove-PSSession
 	
@@ -887,6 +888,9 @@ function DisplayVersion() {
     }
     Write-Host "Max Product = $maxv"
     Write-Host "Farm Build  = $($f.BuildVersion)"
+
+    # Server status table
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
 }
 function IISStart() {
     # Start IIS pools and sites
