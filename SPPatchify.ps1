@@ -1642,6 +1642,12 @@ function Main() {
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
     Write-Host "Servers Online: $($global:servers).Count"
+
+    # Halt if no servers detected
+    if (($global:servers).Count -eq 0) {
+        Write-Host "HALT - POWERSHELL ERROR - No SharePoint servers detected.  Close this window and run from new window." -Fore Red
+        Exit        
+    }
     
     # Read IIS Password
     ReadIISPW    
