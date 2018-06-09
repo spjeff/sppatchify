@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.95
-	Last Modified	: 05-08-2018
+	Version			: 0.96
+	Last Modified	: 05-29-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
