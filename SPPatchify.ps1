@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.96
-	Last Modified	: 05-29-2018
+	Version			: 0.98
+	Last Modified	: 06-09-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -217,11 +217,10 @@ function RunEXE() {
             }
 
             # New SCHTASK parameters
-            $user = $global:username
-            $pw = $global:userpass
+            $user = "System"
             $folder = Split-Path $f
             $a = New-ScheduledTaskAction -Execute $cmd -Argument $params -WorkingDirectory $folder -CimSession $addr
-            $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType Password
+            $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType S4U
             $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
 
             # Create SCHTASK
