@@ -1,4 +1,6 @@
 Year,Month,Product,URL
+2018,6,SP16,https://download.microsoft.com/download/B/2/7/B27FA473-F0E4-4514-9522-F9E19D84C7B9/sts2016-kb4022173-fullfile-x64-glb.exe
+2018,6,SP16,https://download.microsoft.com/download/9/8/2/982D4441-2963-4668-800D-250AD598D48E/wssloc2016-kb4022178-fullfile-x64-glb.exe
 2018,5,SP16,https://download.microsoft.com/download/7/7/0/77007B0A-D0F4-4215-A8CC-BE9C3A79DF3A/sts2016-kb4018381-fullfile-x64-glb.exe
 2018,5,SP16,https://download.microsoft.com/download/1/2/C/12CFD45C-2217-41B1-9B55-9CED742A4A42/wssloc2016-kb4018386-fullfile-x64-glb.exe
 2018,4,SP16,https://download.microsoft.com/download/9/F/6/9F60F822-3A02-4F55-88D7-0B7850226452/sts2016-kb4018336-fullfile-x64-glb.exe
@@ -50,6 +52,9 @@ Year,Month,Product,URL
 2016,5,SP16,https://download.microsoft.com/download/7/D/A/7DA2A7E4-1903-45DA-A1AF-1DF8E79CBABB/wssloc2016-kb2920690-fullfile-x64-glb.exe
 2016,5,SP16,https://download.microsoft.com/download/1/D/2/1D2C38A0-4AE7-47B3-9365-F603CBF1F154/sts2016-kb3115088-fullfile-x64-glb.exe
 2016,4,SP16,https://download.microsoft.com/download/8/D/5/8D589BA9-3EA3-4AF8-A5D6-7BC4DE028531/sts2016-kb2920721-fullfile-x64-glb.exe
+2018,6,SP15,https://download.microsoft.com/download/2/F/3/2F326BF9-BAD3-4528-BF65-FDC02B0501A5/ubersrv2013-kb4022187-fullfile-x64-glb.exe
+2018,6,SP15,https://download.microsoft.com/download/2/F/3/2F326BF9-BAD3-4528-BF65-FDC02B0501A5/ubersrv_1.cab
+2018,6,SP15,https://download.microsoft.com/download/2/F/3/2F326BF9-BAD3-4528-BF65-FDC02B0501A5/ubersrv_2.cab
 2018,5,SP15,https://download.microsoft.com/download/6/6/F/66FC02A7-07EB-4EDA-B94A-CCC7D2C47A6D/ubersrv2013-kb4018397-fullfile-x64-glb.exe
 2018,5,SP15,https://download.microsoft.com/download/6/6/F/66FC02A7-07EB-4EDA-B94A-CCC7D2C47A6D/ubersrv_1.cab
 2018,5,SP15,https://download.microsoft.com/download/6/6/F/66FC02A7-07EB-4EDA-B94A-CCC7D2C47A6D/ubersrv_2.cab
