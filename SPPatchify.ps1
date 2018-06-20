@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.98
-	Last Modified	: 06-09-2018
+	Version			: 0.99
+	Last Modified	: 06-20-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -53,7 +53,11 @@ param (
     [string]$remoteSessionPort,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -remoteSessionSSL to open PSSession (remoting) with SSL encryption.')]
-    [switch]$remoteSessionSSL
+    [switch]$remoteSessionSSL,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -test to open Remote PS Session and verify connectivity all farm members.')]
+    [Alias("test")]
+    [switch]$testRemotePowershell
 )
 
 # Plugin
@@ -67,7 +71,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.95 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.99 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1606,7 +1610,35 @@ function ClearTimerCache($farm) {
     Write-Host ""
 }
 
+function TestRemotePowershell() {
+    # Prepare
+    Get-PSSession | Remove-PSSession -ErrorAction SilentlyContinue | Out-Null
+    ReadIISPW
+
+    # Connect
+    $farm = Get-SPServer |Where-Object {($_.Role -ne "Invalid")}
+    foreach ($f in $farm) {
+        New-PSSession -ComputerName $f.Address -Authentication Credssp -Credential $global:cred
+    }
+
+    # Display
+    Get-PSSession | ft -AutoSize
+    if ($farm.Count -eq (Get-PSSession).Count) {
+        $color = "Green"
+    } else {
+        $color = "Red"
+    }
+    Write-Host "Farm Servers : $($farm.Count)" -Fore $color
+    Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
+}
+
 function Main() {
+    # Test PowerShell
+    if ($testRemotePowershell) {
+        TestRemotePowershell
+        Exit
+    }
+
     # Download media
     if ($downloadMediaOnly) {
         PatchRemoval
@@ -1628,7 +1660,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.95 last modified 05-08-2018"
+    "SPPatchify version 0.99 last modified 06-20-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
