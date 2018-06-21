@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.99
-	Last Modified	: 06-20-2018
+	Version			: 0.101
+	Last Modified	: 06-21-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -1170,7 +1170,7 @@ function PatchMenu() {
         $farm = Get-SPFarm -ErrorAction SilentlyContinue
         if ($farm) {
             $ver = $farm.BuildVersion.Major
-            $sppl = (Get-SPProduct -Local) |Where-Object {$_.ProductName -like "*Project*"}
+            $sppl = (Get-SPProduct -Local) |Where-Object {$_.ProductName -like "*Microsoft Project*"}
             if ($sppl) {
                 if ($ver -ne 16) {
                     $sku = "PROJ"
