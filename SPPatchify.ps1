@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.101
-	Last Modified	: 06-21-2018
+	Version			: 0.102
+	Last Modified	: 06-22-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -229,7 +229,7 @@ function RunEXE() {
 
             # Create SCHTASK
             Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
-            Register-ScheduledTask -TaskName $taskName -InputObject $task -Password $pw -User $user -CimSession $addr
+            Register-ScheduledTask -TaskName $taskName -InputObject $task -User $user -CimSession $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
         }
             
@@ -240,7 +240,11 @@ function RunEXE() {
             do {
                 Write-Host "." -NoNewLine
                 Start-Sleep 5
-                $state = (Get-ScheduledTask -TaskName $taskName -CimSession $addr).State
+                $state = $null
+                $job = Get-ScheduledTask -TaskName $taskName -CimSession $addr
+                if ($job) {
+                    $state = $job.State
+                }
             } while ($state -eq "Running")
         }
     }
