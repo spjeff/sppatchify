@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.106
+	Version			: 0.107
 	Last Modified	: 06-27-2018
 .LINK
 	Source Code
@@ -289,8 +289,8 @@ function WaitEXE($patchName) {
                 Start-Sleep 5
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
-                if ($proc.PriorityClass -ne 2) {
-                    $proc.PriorityClass = 2
+                if ($proc.PriorityClass -ne "High") {
+                    $proc.PriorityClass = "High"
                 }
 
                 # Measure EXE
