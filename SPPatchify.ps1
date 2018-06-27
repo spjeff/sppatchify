@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.105
+	Version			: 0.106
 	Last Modified	: 06-27-2018
 .LINK
 	Source Code
@@ -287,6 +287,11 @@ function WaitEXE($patchName) {
                 $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
                 Write-Host "." -NoNewLine
                 Start-Sleep 5
+
+                # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
+                if ($proc.PriorityClass -ne 2) {
+                    $proc.PriorityClass = 2
+                }
 
                 # Measure EXE
                 $stats = $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
