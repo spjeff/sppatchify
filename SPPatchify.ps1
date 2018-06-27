@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.102
-	Last Modified	: 06-22-2018
+	Version			: 0.104
+	Last Modified	: 06-27-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -56,8 +56,10 @@ param (
     [switch]$remoteSessionSSL,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -test to open Remote PS Session and verify connectivity all farm members.')]
-    [Alias("test")]
-    [switch]$testRemotePowershell
+    [switch]$testRemotePowershell,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -skipProductLocal to run Phase One binary without Get-SPProduct -Local.')]
+    [switch]$skipProductLocal
 )
 
 # Plugin
@@ -225,11 +227,10 @@ function RunEXE() {
             $folder = Split-Path $f
             $a = New-ScheduledTaskAction -Execute $cmd -Argument $params -WorkingDirectory $folder -CimSession $addr
             $p = New-ScheduledTaskPrincipal -RunLevel Highest -UserId $user -LogonType S4U
-            $task = New-ScheduledTask -Action $a -Principal $p -CimSession $addr
 
             # Create SCHTASK
             Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
-            Register-ScheduledTask -TaskName $taskName -InputObject $task -User $user -CimSession $addr
+            Register-ScheduledTask -TaskName $taskName -Action $a -Principal $p
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
         }
             
@@ -837,6 +838,8 @@ function ReadIISPW {
     else {
         $sec = $pass | ConvertTo-SecureString -AsPlainText -Force
     }
+
+    # Save global
     $global:username = $user
     $global:userpass = $pass
     $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user", $sec
