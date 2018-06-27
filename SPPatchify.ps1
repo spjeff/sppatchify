@@ -1451,9 +1451,6 @@ function ClearCacheIni() {
     # Delete all xml files from cache config folder on each server in the farm
     DeleteXmlCache $farm
 
-    # Clear the timer cache on each server in the farm
-    ClearTimerCache $farm
-
     # Start the SharePoint Timer Service on each server in the farm
     ChangeSPTimer $farm $true
     Write-Host "Succeess" -Fore Green
@@ -1467,7 +1464,7 @@ function LaunchPhaseThree() {
 # Stops the SharePoint Timer Service on each server in the SharePoint Farm.
 function ChangeSPTimer($farm, $state) {
     # Constants
-    $timerService = "SPTimerV4"
+    $timer = "SPTimerV4"
     $timerInstance = "Microsoft SharePoint Foundation Timer"  
 
     # Iterate through each server in the farm, and each service in each server
@@ -1478,25 +1475,25 @@ function ChangeSPTimer($farm, $state) {
                 # Display
                 $addr = $server.Address
                 if ($state) {
-                    $change = "Started"
+                    $change = "Running"
                 } else {
                     $change = "Stopped"
                 }
 
-                Write-Host -Foregroundcolor DarkGray -NoNewline "$timerServiceName service on server: "
+                Write-Host -Foregroundcolor DarkGray -NoNewline "$timer service on server: "
                 Write-Host -Foregroundcolor Gray $addr
 
                 # Change
-                $svc = Get-Service -ComputerName $addr -Name $timerService
+                $svc = Get-Service -ComputerName $addr -Name $timer
                 $svc | Set-Service -StartupType Automatic
                 if ($state) {
-                    $svc.Start()
+                    $svc | Start-Service
                 } else {
-                    $svc.Stop()
+                    $svc | Stop-Service
                 }
 
                 # Wait for service stop/start
-                WaitSPTimer $addr $timerServiceName $change
+                WaitSPTimer $addr $timer $change $state
                 break;
             }
         }
@@ -1505,18 +1502,26 @@ function ChangeSPTimer($farm, $state) {
 
 
 # Waits for the service on the server to reach the required service state.
-function WaitSPTimer($addr, $service, $state) {
-    Write-Host -foregroundcolor DarkGray -NoNewLine "Waiting for service '$service' to change state to $state on server $addr"
+function WaitSPTimer($addr, $service, $change, $state) {
+    Write-Host -foregroundcolor DarkGray -NoNewLine "Waiting for $service to change to $change on server $addr"
 
     do {
-        Start-Sleep 1
+        Start-Sleep 3
         Write-Host -Foregroundcolor DarkGray -NoNewLine "."
-        $service = Get-Service -ComputerName $addr -Name $service
+
+        # Change
+        $svc = Get-Service -ComputerName $addr -Name $timer
+        $svc | Set-Service -StartupType Automatic
+        if ($state) {
+            $svc | Start-Service
+        } else {
+            $svc | Stop-Service
+        }
         
     }
-    while ($service.State -ne $state)
+    while ($svc.Status -ne $change)
     Write-Host -Foregroundcolor DarkGray -NoNewLine " Service is "
-    Write-Host -Foregroundcolor Gray $serviceState
+    Write-Host -Foregroundcolor Gray $change
 }
 
 
