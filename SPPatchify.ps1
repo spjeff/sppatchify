@@ -1484,7 +1484,7 @@ function ChangeSPTimer($farm, $state) {
                 }
 
                 Write-Host -Foregroundcolor DarkGray -NoNewline "$timerServiceName service on server: "
-                Write-Host -Foregroundcolor Gray $serverName
+                Write-Host -Foregroundcolor Gray $addr
 
                 # Change
                 $svc = Get-Service -ComputerName $addr -Name $timerService
@@ -1496,7 +1496,7 @@ function ChangeSPTimer($farm, $state) {
                 }
 
                 # Wait for service stop/start
-                WaitSPTimer $serverName $timerServiceName $change
+                WaitSPTimer $addr $timerServiceName $change
                 break;
             }
         }
@@ -1648,7 +1648,9 @@ function Main() {
             IISStart
             RunEXE
             WaitReboot
-            ProductLocal
+            if (!$skipProductLocal) {
+                ProductLocal
+            }
             if (!$phaseOneBinary) {
                 # Reboot and queue Phase two
                 LocalReboot
