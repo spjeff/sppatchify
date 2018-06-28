@@ -76,7 +76,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.99 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.109 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1611,7 +1611,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.99 last modified 06-20-2018"
+    "SPPatchify version 0.109 last modified 06-28-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
