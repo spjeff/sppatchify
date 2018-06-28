@@ -59,7 +59,10 @@ param (
     [switch]$testRemotePowershell,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -skipProductLocal to run Phase One binary without Get-SPProduct -Local.')]
-    [switch]$skipProductLocal
+    [switch]$skipProductLocal,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -targetServers to run for specific machines only.  Applicable to PhaseOne and PhaseTwo.')]
+    [string[]]$targetServers
 )
 
 # Plugin
