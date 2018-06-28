@@ -1571,7 +1571,7 @@ function TestRemotePowershell() {
 
     # Display
     Get-PSSession | ft -AutoSize
-    if ($$global:servers.Count -eq (Get-PSSession).Count) {
+    if ($global:servers.Count -eq (Get-PSSession).Count) {
         $color = "Green"
     } else {
         $color = "Red"
