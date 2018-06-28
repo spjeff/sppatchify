@@ -233,7 +233,7 @@ function RunEXE() {
 
             # Create SCHTASK
             Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
-            Register-ScheduledTask -TaskName $taskName -Action $a -Principal $p
+            Register-ScheduledTask -TaskName $taskName -Action $a -Principal $p -CimSession $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
         }
             
@@ -292,9 +292,13 @@ function WaitEXE($patchName) {
                 Start-Sleep 5
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
-                if ($proc.PriorityClass -ne "High") {
-                    $proc.PriorityClass = "High"
+                $sb = {
+                    $proc = Get-Process -Name $patchName 
+                    if ($proc.PriorityClass -ne "High") {
+                        $proc.PriorityClass = "High"
+                    }
                 }
+                Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
                 # Measure EXE
                 $stats = $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
