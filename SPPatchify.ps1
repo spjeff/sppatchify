@@ -1594,6 +1594,15 @@ function TestRemotePowershell() {
 }
 
 function Main() {
+    # Local farm servers
+    $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
+
+    # Target servers
+    if ($targetServers) {
+        $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
+    }
+    Write-Host "Servers Online: $($global:servers).Count"
+        
     # Test PowerShell
     if ($testRemotePowershell) {
         TestRemotePowershell
@@ -1630,15 +1639,6 @@ function Main() {
     $msg +=	"version = $showVersion"
     $msg +=	"phaseTwo = $phaseTwo"
     Write-Host "Content Databases Online: $((Get-SPContentDatabase).Count)"
-
-    # Local farm servers
-    $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
-
-    # Target servers
-    if ($targetServers) {
-        $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
-    }
-    Write-Host "Servers Online: $($global:servers).Count"
 
     # Halt if no servers detected
     if (($global:servers).Count -eq 0) {
