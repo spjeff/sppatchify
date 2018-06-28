@@ -1450,17 +1450,15 @@ function PreflightCheck() {
 function ClearCacheIni() {  
 
     Write-Host "Clear CACHE.INI " -Fore Green
-    # Get the local farm instance
-    $farm = Get-SPServer | Where-Object {($_.Role -ne "Invalid")}
 
     # Stop the SharePoint Timer Service on each server in the farm
-    ChangeSPTimer $farm $false
+    ChangeSPTimer $false
 
     # Delete all xml files from cache config folder on each server in the farm
-    DeleteXmlCache $farm
+    DeleteXmlCache
 
     # Start the SharePoint Timer Service on each server in the farm
-    ChangeSPTimer $farm $true
+    ChangeSPTimer $true
     Write-Host "Succeess" -Fore Green
 }
 
@@ -1470,13 +1468,13 @@ function LaunchPhaseThree() {
 
 
 # Stops the SharePoint Timer Service on each server in the SharePoint Farm.
-function ChangeSPTimer($farm, $state) {
+function ChangeSPTimer($state) {
     # Constants
     $timer = "SPTimerV4"
     $timerInstance = "Microsoft SharePoint Foundation Timer"  
 
     # Iterate through each server in the farm, and each service in each server
-    foreach ($server in $farm) {
+    foreach ($server in $global:servers) {
         foreach ($instance in $server.ServiceInstances) {
             # If the server has the timer service then stop the service
             if ($instance.TypeName -eq $timerInstance) {
@@ -1534,11 +1532,11 @@ function WaitSPTimer($addr, $service, $change, $state) {
 
 
 # Removes all xml files recursive on an UNC path
-function DeleteXmlCache($farm) {
+function DeleteXmlCache() {
     Write-Host -foregroundcolor DarkGray "Delete xml files"
 
     # Iterate through each server in the farm, and each service in each server
-    foreach ($server in $farm) {
+    foreach ($server in $global:servers) {
         foreach ($instance in $server.ServiceInstances) {
             # If the server has the timer service delete the XML files from the config cache
             if ($instance.TypeName -eq $timerServiceInstanceName) {
@@ -1567,19 +1565,18 @@ function TestRemotePowershell() {
     ReadIISPW
 
     # Connect
-    $farm = Get-SPServer |Where-Object {($_.Role -ne "Invalid")}
-    foreach ($f in $farm) {
+    foreach ($f in $global:servers) {
         New-PSSession -ComputerName $f.Address -Authentication Credssp -Credential $global:cred
     }
 
     # Display
     Get-PSSession | ft -AutoSize
-    if ($farm.Count -eq (Get-PSSession).Count) {
+    if ($$global:servers.Count -eq (Get-PSSession).Count) {
         $color = "Green"
     } else {
         $color = "Red"
     }
-    Write-Host "Farm Servers : $($farm.Count)" -Fore $color
+    Write-Host "Farm Servers : $($global:servers.Count)" -Fore $color
     Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
 }
 
