@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.109
+	Version			: 0.110
 	Last Modified	: 06-28-2018
 .LINK
 	Source Code
@@ -76,7 +76,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.109 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.110 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -1608,7 +1608,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.109 last modified 06-28-2018"
+    "SPPatchify version 0.110 last modified 06-28-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
