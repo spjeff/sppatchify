@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.107
-	Last Modified	: 06-27-2018
+	Version			: 0.108
+	Last Modified	: 06-28-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -1620,6 +1620,11 @@ function Main() {
 
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
+
+    # Target servers
+    if ($targetServers) {
+        $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
+    }
     Write-Host "Servers Online: $($global:servers).Count"
 
     # Halt if no servers detected
@@ -1652,7 +1657,9 @@ function Main() {
             SafetyEXE
             SaveServiceInst
             ChangeServices $true
-            ProductLocal
+            if (!$skipProductLocal) {
+                ProductLocal
+            }
             ChangeDC
             ChangeServices $false
             IISStart
@@ -1675,7 +1682,9 @@ function Main() {
             ChangeContent $false
         }
         ChangeServices $true
-        ProductLocal
+        if (!$skipProductLocal) {
+            ProductLocal
+        }
         RunConfigWizard
         # Launch new window - Phase Three
         LaunchPhaseThree
