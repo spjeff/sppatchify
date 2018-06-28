@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.110
+	Version			: 0.111
 	Last Modified	: 06-28-2018
 .LINK
 	Source Code
@@ -76,7 +76,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.110 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.111 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
@@ -101,8 +101,8 @@ function CopyEXE($action) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
             # Dynamic command
-			$dest = "\\$addr\$remoteRoot\media"
-			mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null;
+            $dest = "\\$addr\$remoteRoot\media"
+            mkdir $dest -Force -ErrorAction SilentlyContinue | Out-Null;
             ROBOCOPY ""$root\media"" ""$dest"" /Z /MIR /W:0 /R:0
         }
     }
@@ -890,7 +890,8 @@ function DisplayVersion() {
     if ($maxv -eq $f.BuildVersion) {
         Write-Host "Max Product = $maxv" -Fore Green
         Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Green
-    } else {
+    }
+    else {
         Write-Host "Max Product = $maxv" -Fore Yellow
         Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Yellow
     }
@@ -1482,7 +1483,8 @@ function ChangeSPTimer($state) {
                 $addr = $server.Address
                 if ($state) {
                     $change = "Running"
-                } else {
+                }
+                else {
                     $change = "Stopped"
                 }
 
@@ -1494,7 +1496,8 @@ function ChangeSPTimer($state) {
                 $svc | Set-Service -StartupType Automatic
                 if ($state) {
                     $svc | Start-Service
-                } else {
+                }
+                else {
                     $svc | Stop-Service
                 }
 
@@ -1520,7 +1523,8 @@ function WaitSPTimer($addr, $service, $change, $state) {
         $svc | Set-Service -StartupType Automatic
         if ($state) {
             $svc | Start-Service
-        } else {
+        }
+        else {
             $svc | Stop-Service
         }
         
@@ -1569,11 +1573,20 @@ function TestRemotePowershell() {
         New-PSSession -ComputerName $f.Address -Authentication Credssp -Credential $global:cred
     }
 
+    # WMI Uptime
+    $sb = {
+        $wmi = Get-WmiObject -Class Win32_OperatingSystem;
+        $t = $wmi.ConvertToDateTime($wmi.LocalDateTime) – $wmi.ConvertToDateTime($wmi.LastBootUpTime);
+        $t | select Days, Hours, Minutes
+    }
+    Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb | Format-Table -AutoSize
+
     # Display
     Get-PSSession | ft -AutoSize
     if ($global:servers.Count -eq (Get-PSSession).Count) {
         $color = "Green"
-    } else {
+    }
+    else {
         $color = "Red"
     }
     Write-Host "Farm Servers : $($global:servers.Count)" -Fore $color
@@ -1608,7 +1621,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.110 last modified 06-28-2018"
+    "SPPatchify version 0.111 last modified 06-28-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
