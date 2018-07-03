@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.111
-	Last Modified	: 06-28-2018
+	Version			: 0.112
+	Last Modified	: 07-03-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -415,6 +415,9 @@ function CalcDuration() {
     }
 }
 function FinalCleanUp() {
+    # Close sessions
+    Get-PSSession | Remove-PSSession
+
     # Loop - Run Task Scheduler
     foreach ($server in $global:servers) {
         $addr = $server.Address
@@ -902,6 +905,9 @@ function DisplayVersion() {
 
     # Server status table
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
+
+    # Database
+    (Get-SPPContentDatabase) | Select-Object Name, NeedsUp* | Format-Table -AutoSize
 }
 function IISStart() {
     # Start IIS pools and sites
@@ -1149,7 +1155,7 @@ function GetMonthInt($name) {
 }
 function PatchRemoval() {
     # Remove patch media
-    $files = Get-ChildItem "$root\media\*.exe" 
+    $files = Get-ChildItem "$root\media\*.exe" -ErrorAction SilentlyContinue | Out-Null
     $files | Format-Table -AutoSize
     $files | Remove-Item -Confirm:$false -Force
 }
