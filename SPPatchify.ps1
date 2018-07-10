@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.112
-	Last Modified	: 07-03-2018
+	Version			: 0.113
+	Last Modified	: 07-10-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -1611,7 +1611,7 @@ function Main() {
     if ($targetServers) {
         $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
     }
-    Write-Host "Servers Online: $($global:servers).Count"
+    Write-Host "Servers Online: $($global:servers.Count)"
         
     # Test PowerShell
     if ($testRemotePowershell) {
