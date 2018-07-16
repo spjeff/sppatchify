@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.114
+	Version			: 0.115
 	Last Modified	: 07-16-2018
 .LINK
 	Source Code
@@ -83,10 +83,10 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.111 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.115 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ProdLocal", "ConfigWiz")
+$stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
 
 # Remote UNC
 $char = $root.ToCharArray()
@@ -542,10 +542,6 @@ function LoopRemoteCmd($msg, $cmd) {
             $stage = "RunEXE"
             break;
         }
-        "Product local*" {
-            $stage = "ProdLocal"
-            break;
-        }
         "Run Config Wizard on*" {
             $stage = "ConfigWiz"
             break;
@@ -623,7 +619,7 @@ function LoopRemoteCmd($msg, $cmd) {
             displayStatus $coll
         }
     }
-    Write-Progress -Activity "Completed $(Get-Date)" -Completed	
+    Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
 function ChangeDC() {
@@ -1668,7 +1664,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.111 last modified 06-28-2018"
+    "SPPatchify version 0.115 last modified 07-16-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
