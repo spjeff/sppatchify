@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.113
-	Last Modified	: 07-10-2018
+	Version			: 0.114
+	Last Modified	: 07-16-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -34,8 +34,8 @@ param (
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -v -showVersion to show farm version info.  READ ONLY, NO SYSTEM CHANGES.')]
     [Alias("v")]
-    [switch]$showVersion,	
-	
+    [switch]$showVersion,
+
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseOneBinary to execute Phase One only (run binary)')]
     [switch]$phaseOneBinary,
 
@@ -62,7 +62,14 @@ param (
     [switch]$skipProductLocal,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -targetServers to run for specific machines only.  Applicable to PhaseOne and PhaseTwo.')]
-    [string[]]$targetServers
+    [string[]]$targetServers,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -w -wave to scope to Odd/Even servers only. -wave 0 (Even) -wave 1 (Odd).  Will sort servers alphabetically by name and take Odd/Even rows for processing.')]
+    [Alias("w")]
+    [int]$wave,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -extract to Extract \media\ EXE to subfolder Local of MSP.  Preference given to MSP and -phaseOne will run those when available.')]
+    [switch]$extract
 )
 
 # Plugin
@@ -904,7 +911,7 @@ function DisplayVersion() {
     }
 
     # Server status table
-    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort Name | Format-Table -AutoSize
 
     # Database
     (Get-SPPContentDatabase) | Select-Object Name, NeedsUp* | Format-Table -AutoSize
@@ -1603,9 +1610,24 @@ function TestRemotePowershell() {
     Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
 }
 
+function ExtractMedia() {
+
+}
+
 function Main() {
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
+
+    # Wave - Target servers
+    $coll = @()
+    $i = 0
+    foreach ($s in $global:servers) {
+        if ($i % 2 -eq $wave) {
+            $coll += $s
+        }
+        $i++
+    }
+    $gloabl:servers = $coll
 
     # Target servers
     if ($targetServers) {
@@ -1623,6 +1645,12 @@ function Main() {
     if ($downloadMediaOnly) {
         PatchRemoval
         PatchMenu
+        Exit
+    }
+
+    # Extract media
+    if ($extract) {
+        ExtractMedia
         Exit
     }
 	
