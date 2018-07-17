@@ -649,7 +649,7 @@ function ChangeDC() {
                     }
                 }
                 while ($hostInfo -and $hostInfo.Status -ne "Down" -and $counter -lt $maxLoops)
-				
+
                 # Force stop
                 Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
                 Stop-SPDistributedCacheServiceInstance
@@ -873,14 +873,14 @@ function DisplayCA() {
     LoopRemoteCmd "Get file version on " $sb
 	
     # Display Version
-    DisplayVersion
+    ShowVersion
 	
     # Open Central Admin
     $ca = (Get-SPWebApplication -IncludeCentralAdministration) | Where-Object {$_.IsAdministrationWebApplication -eq $true}
     $pages = @("PatchStatus.aspx", "UpgradeStatus.aspx", "FarmServers.aspx")
     $pages | ForEach-Object {Start-Process ($ca.Url + "_admin/" + $_)}
 }
-function DisplayVersion() {
+function ShowVersion() {
     # Version Max Patch
     $maxv = 0
     $f = Get-SPFarm
@@ -1655,7 +1655,7 @@ function Main() {
 	
     # Display version
     if ($showVersion) {
-        DisplayVersion
+        ShowVersion
         Exit
     }
 	
