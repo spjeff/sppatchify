@@ -394,7 +394,7 @@ function LocalReboot() {
 }
 function LaunchPhaseThree() {
     # Launch script in new windows for Phase Three - Add Content
-    Start-Process "powershell.exe" -ArgumentList "$root\SPPatchify.ps1 -PhaseThree"
+    Start-Process "powershell.exe" -ArgumentList "$root\SPPatchify.ps1 -phaseThree"
 }
 function CalcDuration() {
     Write-Host "===== DONE ===== $(Get-Date)" -Fore "Yellow"
