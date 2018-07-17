@@ -1623,7 +1623,7 @@ function Main() {
         }
         $i++
     }
-    $gloabl:servers = $coll
+    $gloabal:servers = $coll
 
     # Target servers
     if ($targetServers) {
