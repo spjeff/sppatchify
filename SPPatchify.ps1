@@ -604,7 +604,7 @@ function LoopRemoteCmd($msg, $cmd) {
             }
             $mergeSb = [Scriptblock]::Create($mergeCmd)
         }
-        
+
         # Invoke
         Start-Sleep 3
         if ($remote) {
@@ -612,7 +612,7 @@ function LoopRemoteCmd($msg, $cmd) {
             Invoke-Command -Session $remote -ScriptBlock $mergeSb
         }
         Write-Host "<< complete on $addr" -Fore "Green"
-		
+
         # GUI - Done
         if ($stage) {
             ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 2
@@ -633,7 +633,7 @@ function ChangeDC() {
             $computer = [System.Net.Dns]::GetHostByName($env:computername).HostName
             $counter = 0
             $maxLoops = 60
-			
+
             $cache = Get-CacheHost |Where-Object {$_.HostName -eq $computer}
             if ($cache) {
                 do {
@@ -664,7 +664,7 @@ function ChangeDC() {
 function ChangeServices($state) {
     Write-Host "===== ChangeServices $state ===== $(Get-Date)" -Fore "Yellow"
     $ver = (Get-SPFarm).BuildVersion.Major
-	
+
     # Logic core
     if ($state) {
         $action = "START"
@@ -696,7 +696,7 @@ function ChangeServices($state) {
             }
         }
     }
-	
+
     # Search Crawler
     Write-Host "$action search crawler ..."
     try {
@@ -710,7 +710,7 @@ function ChangeServices($state) {
     }
     catch {
     }
-	
+
     LoopRemoteCmd "$action services on " $sb
 }
 
@@ -723,7 +723,7 @@ function RunConfigWizard() {
         $ver = (Get-SPFarm).BuildVersion.Major
         $psconfig = "C:\Program Files\Common Files\microsoft shared\Web Server Extensions\$ver\BIN\psconfig.exe"
     }
-	
+
     # Save B2B shortcut
     $b2b = {
         $file = $psconfig.replace("psconfig.exe", "psconfigb2b.cmd")
@@ -732,7 +732,7 @@ function RunConfigWizard() {
         }
     }
     LoopRemoteCmd "Save B2B shortcut on " @($shared, $b2b)
-	
+
     # Run Config Wizard - https://blogs.technet.microsoft.com/stefan_gossner/2015/08/20/why-i-prefer-psconfigui-exe-over-psconfig-exe/
     $wiz = {
         & "$psconfig" -cmd "upgrade" -inplace "b2b" -wait -cmd "applicationcontent" -install -cmd "installfeatures" -cmd "secureresources" -cmd "services" -install
@@ -761,7 +761,7 @@ function ChangeContent($state) {
         if ($files -is [Array]) {
             $files = $files[0]
         }
-		
+
         # Loop databases
         if ($files) {
             Write-Host "Content DB - Mount from CSV $($files.Fullname)" -Fore Yellow
@@ -771,14 +771,14 @@ function ChangeContent($state) {
                 $dbs | Where-Object {
                     $name = $_.Name
                     $name
-                
+
                     # Progress
                     $prct = [Math]::Round(($counter / $dbs.Count) * 100)
                     if ($prct) {
                         Write-Progress -Activity "Add database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
                     }
                     $counter++
-            
+
                     $wa = [Microsoft.SharePoint.Administration.SPWebApplication]::Lookup($_.WebApp)
                     if ($wa) {
                         Mount-SPContentDatabase -WebApplication $wa -Name $name -DatabaseServer $_.NormalizedDataSource | Out-Null
@@ -1727,7 +1727,7 @@ function Main() {
     # Phase Two - SP Config Wizard
     if ($phaseTwo) {
         SafetyInstallRequired
-        DetectAdmin        
+        DetectAdmin
         if (!$onlineContent) {
             ChangeContent $false
         }
