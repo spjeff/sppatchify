@@ -10,7 +10,7 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.117
+	Version			: 0.118
 	Last Modified	: 07-17-2018
 .LINK
 	Source Code
@@ -910,7 +910,10 @@ function DisplayVersion() {
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort Name | Format-Table -AutoSize
 
     # Database
-    (Get-SPContentDatabase) | Select-Object Name, NeedsUp* | Format-Table -AutoSize
+    $d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
+    $d | Group-Object NeedsUpgrade | Format-Table -AutoSize
+    "---"
+    $d | Sort-Object NeedsUpgrade,Name | Select-Object NeedsUpgrade,Name | Format-Table -AutoSize
 }
 function IISStart() {
     # Start IIS pools and sites
