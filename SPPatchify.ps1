@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.115
-	Last Modified	: 07-16-2018
+	Version			: 0.116
+	Last Modified	: 07-17-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -59,7 +59,7 @@ param (
     [switch]$testRemotePowershell,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -skipProductLocal to run Phase One binary without Get-SPProduct -Local.')]
-    [switch]$skipProductLocal,
+    [switch]$skipProductLocal=$false,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -targetServers to run for specific machines only.  Applicable to PhaseOne and PhaseTwo.')]
     [string[]]$targetServers,
