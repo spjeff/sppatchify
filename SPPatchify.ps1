@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.118
-	Last Modified	: 07-17-2018
+	Version			: 0.120
+	Last Modified	: 07-23-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -66,10 +66,7 @@ param (
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -w -wave to scope to Odd/Even servers only. -wave 0 (Even) -wave 1 (Odd).  Will sort servers alphabetically by name and take Odd/Even rows for processing.')]
     [Alias("w")]
-    [int]$wave,
-
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -extract to Extract \media\ EXE to subfolder Local of MSP.  Preference given to MSP and -phaseOne will run those when available.')]
-    [switch]$extract
+    [int]$wave
 )
 
 # Plugin
@@ -100,8 +97,8 @@ function CopyEXE($action) {
     Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
 	
     # Clear old session
-    Get-Job | Remove-Job
-    Get-PSSession | Remove-PSSession
+    Get-Job | Remove-Job -Force
+    Get-PSSession | Remove-PSSession -Force
 
     # Start Jobs
     foreach ($server in $global:servers) {
@@ -742,7 +739,10 @@ function RunConfigWizard() {
 
 function ChangeContent($state) {
     Write-Host "===== ContentDB $state ===== $(Get-Date)" -Fore "Yellow"
+    # Display
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint") | Out-Null
+    $c = (Get-SPContentDatabase).Count
+    Write-Host "Content Databases Online: $c"
 
     if (!$state) {
         # Remove content
@@ -851,7 +851,7 @@ function ReadIISPW {
 
     # Prompt for password
     if (!$pass) {
-        $sec = Read-Host "Enter password: " -AsSecureString
+        $sec = Read-Host "Enter password " -AsSecureString
     }
     else {
         $sec = $pass | ConvertTo-SecureString -AsPlainText -Force
@@ -907,7 +907,7 @@ function ShowVersion() {
     }
 
     # Server status table
-    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort Name | Format-Table -AutoSize
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort-Object Name | Format-Table -AutoSize
 
     # Database
     $d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
@@ -1593,12 +1593,12 @@ function TestRemotePowershell() {
     $sb = {
         $wmi = Get-WmiObject -Class Win32_OperatingSystem;
         $t = $wmi.ConvertToDateTime($wmi.LocalDateTime) – $wmi.ConvertToDateTime($wmi.LastBootUpTime);
-        $t | select Days, Hours, Minutes
+        $t | Select-Object Days, Hours, Minutes
     }
     Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb | Format-Table -AutoSize
 
     # Display
-    Get-PSSession | ft -AutoSize
+    Get-PSSession | Format-Table -AutoSize
     if ($global:servers.Count -eq (Get-PSSession).Count) {
         $color = "Green"
     }
@@ -1609,24 +1609,22 @@ function TestRemotePowershell() {
     Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
 }
 
-function ExtractMedia() {
-
-}
-
 function Main() {
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
 
     # Wave - Target servers
-    $coll = @()
-    $i = 0
-    foreach ($s in $global:servers) {
-        if ($i % 2 -eq $wave) {
-            $coll += $s
+    if ($wave) {
+        $coll = @()
+        $i = 0
+        foreach ($s in $global:servers) {
+            if ($i % 2 -eq $wave) {
+                $coll += $s
+            }
+            $i++
         }
-        $i++
+        $global:servers = $coll
     }
-    $gloabal:servers = $coll
 
     # Target servers
     if ($targetServers) {
@@ -1644,12 +1642,6 @@ function Main() {
     if ($downloadMediaOnly) {
         PatchRemoval
         PatchMenu
-        Exit
-    }
-
-    # Extract media
-    if ($extract) {
-        ExtractMedia
         Exit
     }
 	
