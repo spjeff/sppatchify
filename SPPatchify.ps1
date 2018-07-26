@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.120
-	Last Modified	: 07-23-2018
+	Version			: 0.121
+	Last Modified	: 07-25-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -98,7 +98,7 @@ function CopyEXE($action) {
 	
     # Clear old session
     Get-Job | Remove-Job -Force
-    Get-PSSession | Remove-PSSession -Force
+    Get-PSSession | Remove-PSSession -Confirm:$false
 
     # Start Jobs
     foreach ($server in $global:servers) {
