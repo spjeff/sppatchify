@@ -3,15 +3,15 @@
 	SharePoint Central Admin - View active services across entire farm. No more select machine drop down dance!
 .DESCRIPTION
 	Apply CU patch to entire farm from one PowerShell console.
-	
+
 	NOTE - must run local to a SharePoint server under account with farm admin rights.
 
 	Comments and suggestions always welcome!  spjeff@spjeff.com or @spjeff
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.121
-	Last Modified	: 07-25-2018
+	Version			: 0.122
+	Last Modified	: 07-26-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -95,7 +95,7 @@ $remoteRoot = -join $char
 #region binary EXE
 function CopyEXE($action) {
     Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
-	
+
     # Clear old session
     Get-Job | Remove-Job -Force
     Get-PSSession | Remove-PSSession -Confirm:$false
@@ -126,11 +126,11 @@ function CopyEXE($action) {
                     Write-Progress -Activity "Copy EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct -ErrorAction SilentlyContinue
                 }
             }
-			
+
             # GUI In Progress
             ($coll |Where-Object {$_.Server -eq $server.Address}).CopyEXE = 1
             displayStatus $coll
-			
+
             # Check Job Status
             foreach ($job in Get-Job) {
                 Get-Job | Format-Table -AutoSize
@@ -141,7 +141,6 @@ function CopyEXE($action) {
                     displayStatus $coll
                 }
             }
-			
         }
         Start-Sleep 5
         $pending = Get-Job |Where-Object {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
@@ -160,7 +159,7 @@ function SafetyInstallRequired() {
     # Display server upgrade
     Write-Host "Farm Servers - Upgrade Status " -Fore "Yellow"
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Sort-Object Servername | Format-Table -AutoSize
-	
+
     $halt = (Get-SPProduct).Servers |Where-Object {$_.InstallStatus -eq "InstallRequired"}
     if ($halt) {
         $halt | Format-Table -AutoSize
@@ -197,13 +196,13 @@ function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
     $coll = newStatus("RunEXE")
     displayStatus $coll
-    
+
     # Remove MSPLOG
     LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
-	
+
     # Remove MSPLOG
     LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
-	
+
     # Build CMD
     $files = Get-ChildItem "$root\media\*.exe" | Sort-Object Name
     foreach ($f in $files) {
@@ -238,23 +237,15 @@ function RunEXE() {
             # Create SCHTASK
             Write-Host "Register and start SCHTASK - $addr - $cmd" -Fore Green
             Register-ScheduledTask -TaskName $taskName -Action $a -Principal $p -CimSession $addr
+
+            # Event log START
+            New-EventLog -LogName Application -Source SPPatchify -ErrorAction SilentlyContinue | Out-Null
+            Write-EventLog -LogName Application -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "START" -ComputerName $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
         }
-            
-        # Loop - Wait and check status
-        foreach ($server in $global:servers) {
-            $addr = $server.Address
-            Write-Host "Monitor SCHTASK - $addr " -Fore Yellow
-            do {
-                Write-Host "." -NoNewLine
-                Start-Sleep 5
-                $state = $null
-                $job = Get-ScheduledTask -TaskName $taskName -CimSession $addr
-                if ($job) {
-                    $state = $job.State
-                }
-            } while ($state -eq "Running")
-        }
+
+        # Watch EXE binary complete
+        WaitEXE $patchName
     }
 	
     # SharePoint 2016 Force Reboot
@@ -271,11 +262,11 @@ function RunEXE() {
 function WaitEXE($patchName) {
     Write-Host "===== WaitEXE ===== $(Get-Date)" -Fore "Yellow"
 	
-    # Wait for reboot
+    # Wait for EXE intialize
     Write-Host "Wait 60 sec..."
     Start-Sleep 60
 
-    # Verify machines online
+    # Watch binary complete
     $counter = 0
     if ($global:servers) {
         foreach ($server in $global:servers) {	
@@ -286,39 +277,37 @@ function WaitEXE($patchName) {
                 Write-Progress -Activity "Wait EXE ($prct %) $(Get-Date)" -Status $addr -PercentComplete $prct
             }
             $counter++
-            
+
             # Remote Posh
             Write-Host "`nEXE monitor started on $addr at $(Get-Date) " -NoNewLine
             do {
                 # Monitor EXE process
                 $proc = Get-Process -Name $patchName -Computer $addr -ErrorAction SilentlyContinue
                 Write-Host "." -NoNewLine
-                Start-Sleep 5
+                Start-Sleep 10
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
-                $sb = {
-                    $proc = Get-Process -Name $patchName 
-                    if ($proc.PriorityClass -ne "High") {
-                        $proc.PriorityClass = "High"
-                    }
-                }
+                # $priorityhash = @{-2="Idle";-1="BelowNormal";0="Normal";1="AboveNormal";2="High";3="RealTime"} 
+                $cmd ="{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""RealTime"") {`$proc.PriorityClass = ""RealTime""}}"
+                $sb = [Scriptblock]::Create($cmd)
                 Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
                 # Measure EXE
                 $stats = $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
-                
+
                 # Count MSPLOG files
                 $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
                 $sb = [Scriptblock]::Create($cmd)
                 $result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
                 $msp = $result | Select-Object Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | Sort-Object LastWriteTime, Server -Desc
-                
+
                 # HTML view
                 $coll = newStatus("RunEXE")
                 ($coll |Where-Object {$_.Server -eq $addr}).RunEXE = 1
                 displayStatus $coll $false $false $msp $stats
             }
             while ($proc)
+            Write-EventLog -LogName Application -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "DONE" -ComputerName $addr
         }
     }
 }
