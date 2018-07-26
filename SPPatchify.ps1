@@ -66,7 +66,10 @@ param (
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -w -wave to scope to Odd/Even servers only. -wave 0 (Even) -wave 1 (Odd).  Will sort servers alphabetically by name and take Odd/Even rows for processing.')]
     [Alias("w")]
-    [int]$wave
+    [int]$wave,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -productlocal to execute remote cmdlet [Get-SPProduct -Local] on all servers in farm, or target/wave servers only if given.')]
+    [switch]$productlocal
 )
 
 # Plugin
@@ -1620,6 +1623,13 @@ function Main() {
         $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
     }
     Write-Host "Servers Online: $($global:servers.Count)"
+
+    # Run SPPL to detect new binary patches
+    if ($productlocal) {
+        TestRemotePowershell
+        LoopRemoteCmd "Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue; Get-SPProduct -Local"
+        Exit
+    }
         
     # Test PowerShell
     if ($testRemotePowershell) {
@@ -1676,7 +1686,7 @@ function Main() {
     # Core steps
     if (!$phaseTwo -and !$phaseThree) {
         if ($copyMediaOnly) {
-            # Copy media only (switch -C)            
+            # Copy media only (switch -C)
             CopyEXE "Copy"
         }
         else {
