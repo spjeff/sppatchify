@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.122
-	Last Modified	: 07-26-2018
+	Version			: 0.124
+	Last Modified	: 07-27-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -69,7 +69,10 @@ param (
     [int]$wave,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -productlocal to execute remote cmdlet [Get-SPProduct -Local] on all servers in farm, or target/wave servers only if given.')]
-    [switch]$productlocal
+    [switch]$productlocal,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -mount to execute Mount-SPContentDatabase to load CSV and attach content databases to web applications.')]
+    [string]$mount
 )
 
 # Plugin
@@ -83,7 +86,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.115 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.124 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -220,12 +223,12 @@ function RunEXE() {
         # Loop - Run Task Scheduler
         foreach ($server in $global:servers) {
             # Local PC - No reboot
-            if ($server.Address -eq $env:computername) {
+            $addr = $server.Address
+            if ($addr -eq $env:computername) {
                 $params = $params.Replace("forcerestart", "norestart")
             }
 
             # Remove SCHTASK if found
-            $addr = $server.Address
             $found = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue -CimSession $addr
             if ($found) {
                 $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
@@ -254,9 +257,10 @@ function RunEXE() {
     # SharePoint 2016 Force Reboot
     if ($ver -eq 16) {
         foreach ($server in $global:servers) {
-            if ($server.Address -ne $env:computername) {
-                Write-Host "Reboot $($server.Address)" -Fore Yellow
-                Restart-Computer -ComputerName $server.Address
+            $addr = $server.Address
+            if ($addr -ne $env:computername) {
+                Write-Host "Reboot $($addr)" -Fore Yellow
+                Restart-Computer -ComputerName $addr
             }
         }
     }
@@ -448,7 +452,8 @@ function LoopRemotePatch($msg, $cmd, $params) {
     foreach ($server in $global:servers) {
         # Overwrite restart parameter
         $ver = (Get-SPFarm).BuildVersion.Major
-        if ($ver -eq 16 -or $env:computername -eq $server.Address) {
+        $addr = $server.Address
+        if ($ver -eq 16 -or $env:computername -eq $addr) {
             $cmd = $cmd.replace("forcerestart", "norestart")
         }
 
@@ -461,7 +466,6 @@ function LoopRemotePatch($msg, $cmd, $params) {
         }
 	
         # Progress
-        $addr = $server.Address
         $prct = [Math]::Round(($counter / $global:servers.Count) * 100)
         if ($prct) {
             Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
@@ -470,7 +474,7 @@ function LoopRemotePatch($msg, $cmd, $params) {
 		
         # GUI - In Progress
         if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 1
+            ($coll |Where-Object {$_.Server -eq $addr})."$stage" = 1
             displayStatus $coll
         }
 		
@@ -503,7 +507,7 @@ function LoopRemotePatch($msg, $cmd, $params) {
 		
         # GUI - Done
         if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 2
+            ($coll |Where-Object {$_.Server -eq $addr})."$stage" = 2
             displayStatus $coll
         }
     }
@@ -1601,6 +1605,16 @@ function TestRemotePowershell() {
     Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
 }
 
+function MountContentDatabases() {
+    $csv = Import-Csv $mount
+    foreach ($row in $csv) {
+        # Mount CDB
+        Write-Host "Mount " + $row.Name + "," + $row.NormalizedDataSource + "," + $row.WebApp -Fore "Yellow"
+        $wa = Get-SPWebApplication $row.WebApp
+        Mount-SPContentDatabase -WebApplication $wa -Name $row.Name -DatabaseServer $row.NormalizedDataSource
+    }
+}
+
 function Main() {
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
@@ -1618,7 +1632,7 @@ function Main() {
         $global:servers = $coll
     }
 
-    # Target servers
+    # List - Target servers
     if ($targetServers) {
         $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
     }
@@ -1649,6 +1663,12 @@ function Main() {
         ShowVersion
         Exit
     }
+
+    # Mount Databases
+    if ($mount) {
+        MountContentDatabases
+        Exit
+    }
 	
     # Start LOG
     $start = Get-Date
@@ -1658,7 +1678,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.115 last modified 07-16-2018"
+    "SPPatchify version 0.124 last modified 07-27-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
