@@ -917,10 +917,10 @@ function ShowVersion() {
     $coll = @()
     $global:servers |% {
         $addr = $_.Address;
-        $root = (Get-Website "Default Web Site").Path
-        $remoteroot = MakeRemote 
+        $root = (Get-Website "Default Web Site").PhysicalPath
+        $remoteroot = MakeRemote $root
         $status = (Get-Content $remoteroot)[1];
-        $coll += @{"Server"=$addr; "Status"=$status}
+        $coll += @{"Server" = $addr; "Status" = $status}
     }
     $coll | ft -a
 
