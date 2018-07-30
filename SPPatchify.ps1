@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.124
-	Last Modified	: 07-27-2018
+	Version			: 0.125
+	Last Modified	: 07-30-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -72,7 +72,13 @@ param (
     [switch]$productlocal,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -mount to execute Mount-SPContentDatabase to load CSV and attach content databases to web applications.')]
-    [string]$mount
+    [string]$mount,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -installAppOffline to copy app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
+    [string]$installAppOffline,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -uninstallAppOffline to DELETE app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
+    [string]$uninstallAppOffline
 )
 
 # Plugin
@@ -91,14 +97,15 @@ $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
 
-# Remote UNC
-$char = $root.ToCharArray()
-if ($char[1] -eq ':') {
-    $char[1] = '$'
-}
-$remoteRoot = -join $char
-
 #region binary EXE
+function MakeRemote($path) {
+    # Remote UNC
+    $char = $path.ToCharArray()
+    if ($char[1] -eq ':') {
+        $char[1] = '$'
+    }
+    return (-join $char)
+}
 function CopyEXE($action) {
     Write-Host "===== $action EXE ===== $(Get-Date)" -Fore "Yellow"
 
@@ -662,7 +669,7 @@ function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | ForEach-Object {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -678,7 +685,7 @@ function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights") | ForEach-Object {
+            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights","DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
@@ -1615,9 +1622,41 @@ function MountContentDatabases() {
     }
 }
 
+function AppOffline ($state) {
+    # Deploy App_Offline.ht to peer IIS instances across the farm
+    $ao = "app_offline.htm"
+    $folders = Get-SPWebApplication |% {$wa=$_; $wa.IIsSettings[0].Path}
+        # Start Jobs
+        foreach ($server in $global:servers) {
+            $addr = $server.Address
+            if ($addr -ne $env:computername) {
+                if ($f in $folders) {
+                    # IIS Home Folders
+                    $remoteRoot = MakeRemote $f
+                    if ($state) {
+                        # Install by HTM file copy
+                        # Dynamic command
+                        $dest = "\\$addr\$remoteroot\app_offline.htm"
+                        Write-Host "Copying $ao to $dest" -Fore Yellow
+                        ROBOCOPY $ao $dest /Z /MIR /W:0 /R:0
+                    } else {
+                        # Uinstall by HTM file delete
+                        # Dynamic command
+                        $dest = "\\$addr\$remoteroot\app_offline.htm"
+                        Write-Host "Deleting $ao to $dest" -Fore Yellow
+                        Remove-ChildItem $dest -Confirm:$false
+                    }
+                }
+            }
+        }
+
+  
+}
+
 function Main() {
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
+    $remoteRoot = MakeRemote $root
 
     # Wave - Target servers
     if ($wave) {
@@ -1667,6 +1706,16 @@ function Main() {
     # Mount Databases
     if ($mount) {
         MountContentDatabases
+        Exit
+    }
+
+    # Install App_Offline
+    if ($installAppOffline) {
+        AppOffline $true
+        Exit
+    }
+    if ($uninstallAppOffline) {
+        AppOffline $false
         Exit
     }
 	
