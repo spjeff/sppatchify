@@ -912,6 +912,18 @@ function ShowVersion() {
     # Server status table
     (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort-Object Name | Format-Table -AutoSize
 
+    # IIS UP/DOWN Load Balancer
+    Write-Host "IIS UP/DOWN Load Balancer"
+    $coll = @()
+    $global:servers |% {
+        $addr = $_.Address;
+        $root = (Get-Website "Default Web Site").Path
+        $remoteroot = MakeRemote 
+        $status = (Get-Content $remoteroot)[1];
+        $coll += @{"Server"=$addr; "Status"=$status}
+    }
+    $coll | ft -a
+
     # Database
     $d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
     $d | Group-Object NeedsUpgrade | Format-Table -AutoSize
