@@ -1642,7 +1642,7 @@ function AppOffline ($state) {
     foreach ($server in $global:servers) {
         $addr = $server.Address
         if ($addr -ne $env:computername) {
-            if ($f in $folders) {
+            foreach ($f in $folders) {
                 # IIS Home Folders
                 $remoteRoot = MakeRemote $f
                 if ($state) {
