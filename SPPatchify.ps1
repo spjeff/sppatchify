@@ -1637,32 +1637,30 @@ function MountContentDatabases() {
 function AppOffline ($state) {
     # Deploy App_Offline.ht to peer IIS instances across the farm
     $ao = "app_offline.htm"
-    $folders = Get-SPWebApplication |% {$wa=$_; $wa.IIsSettings[0].Path}
-        # Start Jobs
-        foreach ($server in $global:servers) {
-            $addr = $server.Address
-            if ($addr -ne $env:computername) {
-                if ($f in $folders) {
-                    # IIS Home Folders
-                    $remoteRoot = MakeRemote $f
-                    if ($state) {
-                        # Install by HTM file copy
-                        # Dynamic command
-                        $dest = "\\$addr\$remoteroot\app_offline.htm"
-                        Write-Host "Copying $ao to $dest" -Fore Yellow
-                        ROBOCOPY $ao $dest /Z /MIR /W:0 /R:0
-                    } else {
-                        # Uinstall by HTM file delete
-                        # Dynamic command
-                        $dest = "\\$addr\$remoteroot\app_offline.htm"
-                        Write-Host "Deleting $ao to $dest" -Fore Yellow
-                        Remove-ChildItem $dest -Confirm:$false
-                    }
+    $folders = Get-SPWebApplication |% {$_.IIsSettings[0].Path.FullName}
+    # Start Jobs
+    foreach ($server in $global:servers) {
+        $addr = $server.Address
+        if ($addr -ne $env:computername) {
+            if ($f in $folders) {
+                # IIS Home Folders
+                $remoteRoot = MakeRemote $f
+                if ($state) {
+                    # Install by HTM file copy
+                    # Dynamic command
+                    $dest = "\\$addr\$remoteroot\app_offline.htm"
+                    Write-Host "Copying $ao to $dest" -Fore Yellow
+                    ROBOCOPY $ao $dest /Z /MIR /W:0 /R:0
+                } else {
+                    # Uinstall by HTM file delete
+                    # Dynamic command
+                    $dest = "\\$addr\$remoteroot\app_offline.htm"
+                    Write-Host "Deleting $ao to $dest" -Fore Yellow
+                    Remove-ChildItem $dest -Confirm:$false
                 }
             }
         }
-
-  
+    }
 }
 
 function Main() {
