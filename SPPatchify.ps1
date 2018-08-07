@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.125
-	Last Modified	: 07-30-2018
+	Version			: 0.126
+	Last Modified	: 08-04-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -38,6 +38,9 @@ param (
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseOneBinary to execute Phase One only (run binary)')]
     [switch]$phaseOneBinary,
+	
+	[Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -quick to run ONLY EXE binary')]
+    [switch]$quick,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseTwo to execute Phase Two after local reboot.')]
     [switch]$phaseTwo,
@@ -74,7 +77,7 @@ param (
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -mount to execute Mount-SPContentDatabase to load CSV and attach content databases to web applications.')]
     [string]$mount,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -installAppOffline to copy app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -installAppOffline to COPY app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
     [string]$installAppOffline,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -uninstallAppOffline to DELETE app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
@@ -92,7 +95,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.124 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.126 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -669,7 +672,7 @@ function ChangeServices($state) {
     if ($state) {
         $action = "START"
         $sb = {
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
+            @("IISADMIN", "W3SVC", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue
                     Start-Service $_ -ErrorAction SilentlyContinue
@@ -685,7 +688,7 @@ function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights","DocAve 6 Agent Service") | ForEach-Object {
+            @("IISADMIN", "W3SVC", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights","DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
@@ -898,20 +901,7 @@ function ShowVersion() {
             $maxv = $v
         }
     }
-
-    # Display data
-    if ($maxv -eq $f.BuildVersion) {
-        Write-Host "Max Product = $maxv" -Fore Green
-        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Green
-    }
-    else {
-        Write-Host "Max Product = $maxv" -Fore Yellow
-        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Yellow
-    }
-
-    # Server status table
-    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus | Group-Object Servername, InstallStatus | Sort-Object Name | Format-Table -AutoSize
-
+	
     # IIS UP/DOWN Load Balancer
     Write-Host "IIS UP/DOWN Load Balancer"
     $coll = @()
@@ -924,11 +914,29 @@ function ShowVersion() {
     }
     $coll | ft -a
 
-    # Database
-    $d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
-    $d | Group-Object NeedsUpgrade | Format-Table -AutoSize
-    "---"
+    # Database table
+	$d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
     $d | Sort-Object NeedsUpgrade,Name | Select-Object NeedsUpgrade,Name | Format-Table -AutoSize
+
+	# Database summary
+	$d | Group-Object NeedsUpgrade | Format-Table -AutoSize
+    "---"
+	
+	# Server status table
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus,Servername | Sort-Object Name | Format-Table -AutoSize
+	
+	# Server status summary
+	(Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus | Sort-Object Name | Format-Table -AutoSize
+
+    # Display data
+    if ($maxv -eq $f.BuildVersion) {
+        Write-Host "Max Product = $maxv" -Fore Green
+        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Green
+    }
+    else {
+        Write-Host "Max Product = $maxv" -Fore Yellow
+        Write-Host "Farm Build  = $($f.BuildVersion)" -Fore Yellow
+    }
 }
 function IISStart() {
     # Start IIS pools and sites
@@ -1628,7 +1636,7 @@ function MountContentDatabases() {
     $csv = Import-Csv $mount
     foreach ($row in $csv) {
         # Mount CDB
-        Write-Host "Mount " + $row.Name + "," + $row.NormalizedDataSource + "," + $row.WebApp -Fore "Yellow"
+        Write-Host "Mount " $row.Name ","  $row.NormalizedDataSource  "," $row.WebApp -Fore "Yellow"
         $wa = Get-SPWebApplication $row.WebApp
         Mount-SPContentDatabase -WebApplication $wa -Name $row.Name -DatabaseServer $row.NormalizedDataSource
     }
@@ -1769,22 +1777,27 @@ function Main() {
             CopyEXE "Copy"
         }
         else {
-            # Phase One - Binary EXE
-            PatchMenu
-            EnablePSRemoting
-            ClearCacheIni
-            CopyEXE "Copy"
-            SafetyEXE
-            SaveServiceInst
-            ChangeServices $true
-            if (!$skipProductLocal) {
-                ProductLocal
-            }
-            ChangeDC
-            ChangeServices $false
-            IISStart
-            RunEXE
-            WaitReboot
+            # Phase One - Binary EXE.  Quick mode EXE only.
+			if ($quick) {
+				RunEXE
+				WaitReboot
+			} else {
+				PatchMenu
+				EnablePSRemoting
+				ClearCacheIni
+				CopyEXE "Copy"
+				SafetyEXE
+				SaveServiceInst
+				ChangeServices $true
+				if (!$skipProductLocal) {
+					ProductLocal
+				}
+				ChangeDC
+				ChangeServices $false
+				IISStart
+				RunEXE
+				WaitReboot
+			}
             if (!$skipProductLocal) {
                 ProductLocal
             }
