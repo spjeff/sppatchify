@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.126
-	Last Modified	: 08-04-2018
+	Version			: 0.127
+	Last Modified	: 08-08-2018
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -95,7 +95,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.126 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.127 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -305,7 +305,7 @@ function WaitEXE($patchName) {
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
                 # $priorityhash = @{-2="Idle";-1="BelowNormal";0="Normal";1="AboveNormal";2="High";3="RealTime"} 
-                $cmd ="{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""RealTime"") {`$proc.PriorityClass = ""RealTime""}}"
+                $cmd ="{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""High"") {`$proc.PriorityClass = ""High""}}"
                 $sb = [Scriptblock]::Create($cmd)
                 Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
@@ -1745,7 +1745,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.124 last modified 07-27-2018"
+    "SPPatchify version 0.127 last modified 08-08-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
