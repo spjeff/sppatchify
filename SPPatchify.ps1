@@ -10,8 +10,9 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.128
-	Last Modified	: 09-03-2018
+	Version			: 0.129
+    Last Modified	: 09-03-2018
+    
 .LINK
 	Source Code
 	http://www.github.com/spjeff/sppatchify
@@ -95,7 +96,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.128 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.129 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -324,7 +325,7 @@ function WaitEXE($patchName) {
                 displayStatus $coll $false $false $msp $stats
             }
             while ($proc)
-            New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr
+            New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr -ErrorAction SilentlyContinue | Out-Null
             Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "DONE" -ComputerName $addr
         }
     }
@@ -1746,7 +1747,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.128 last modified 09-03-2018"
+    "SPPatchify version 0.129 last modified 09-03-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
