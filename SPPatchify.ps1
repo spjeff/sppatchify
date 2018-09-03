@@ -255,8 +255,8 @@ function RunEXE() {
             Register-ScheduledTask -TaskName $taskName -Action $a -Principal $p -CimSession $addr
 
             # Event log START
-            New-EventLog -LogName Application -Source SPPatchify -ErrorAction SilentlyContinue | Out-Null
-            Write-EventLog -LogName Application -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "START" -ComputerName $addr
+            New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr -ErrorAction SilentlyContinue | Out-Null
+            Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "START" -ComputerName $addr
             Start-ScheduledTask -TaskName $taskName -CimSession $addr
         }
 
