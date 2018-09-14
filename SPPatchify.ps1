@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.129
-    Last Modified	: 09-03-2018
+	Version			: 0.130
+    Last Modified	: 09-14-2018
     
 .LINK
 	Source Code
@@ -96,7 +96,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.129 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.130 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -1494,12 +1494,15 @@ function ClearCacheIni() {
     Write-Host "Clear CACHE.INI " -Fore Green
 
     # Stop the SharePoint Timer Service on each server in the farm
+	Write-Host "Change SPTimer to OFF" -Fore Green
     ChangeSPTimer $false
 
     # Delete all xml files from cache config folder on each server in the farm
+	Write-Host "Clear XML cache"
     DeleteXmlCache
 
     # Start the SharePoint Timer Service on each server in the farm
+	Write-Host "Change SPTimer to ON" -Fore Red
     ChangeSPTimer $true
     Write-Host "Succeess" -Fore Green
 }
@@ -1587,7 +1590,7 @@ function DeleteXmlCache() {
             if ($instance.TypeName -eq $timerServiceInstanceName) {
                 [string]$serverName = $server.Name
 
-                Write-Host -foregroundcolor DarkGray -NoNewline "Deleting xml files from config cache on server: "
+                Write-Host -foregroundcolor DarkGray -NoNewline "Deleting xml files from config cache on server: $serverName"
                 Write-Host -foregroundcolor Gray $serverName
 
                 # Remove all xml files recursive on an UNC path
@@ -1747,7 +1750,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.129 last modified 09-03-2018"
+    "SPPatchify version 0.130 last modified 09-14-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
