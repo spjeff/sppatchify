@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.130
-    Last Modified	: 09-14-2018
+	Version			: 0.131
+    Last Modified	: 09-26-2018
     
 .LINK
 	Source Code
@@ -96,7 +96,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.130 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.131 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -910,8 +910,8 @@ function ShowVersion() {
     $global:servers |% {
         $addr = $_.Address;
         $root = (Get-Website "Default Web Site").PhysicalPath
-        $remoteroot = MakeRemote $root
-        $status = (Get-Content $remoteroot)[1];
+        $remoteRoot = MakeRemote $root
+        $status = (Get-Content $remoteRoot)[1];
         $coll += @{"Server" = $addr; "Status" = $status}
     }
     $coll | ft -a
@@ -1661,13 +1661,13 @@ function AppOffline ($state) {
                 if ($state) {
                     # Install by HTM file copy
                     # Dynamic command
-                    $dest = "\\$addr\$remoteroot\app_offline.htm"
+                    $dest = "\\$addr\$remoteRoot\app_offline.htm"
                     Write-Host "Copying $ao to $dest" -Fore Yellow
                     ROBOCOPY $ao $dest /Z /MIR /W:0 /R:0
                 } else {
                     # Uinstall by HTM file delete
                     # Dynamic command
-                    $dest = "\\$addr\$remoteroot\app_offline.htm"
+                    $dest = "\\$addr\$remoteRoot\app_offline.htm"
                     Write-Host "Deleting $ao to $dest" -Fore Yellow
                     Remove-ChildItem $dest -Confirm:$false
                 }
@@ -1750,7 +1750,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.130 last modified 09-14-2018"
+    "SPPatchify version 0.131 last modified 09-26-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
