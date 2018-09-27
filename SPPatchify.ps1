@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.131
-    Last Modified	: 09-26-2018
+	Version			: 0.132
+    Last Modified	: 09-27-2018
     
 .LINK
 	Source Code
@@ -96,7 +96,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.131 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.132 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -909,7 +909,7 @@ function ShowVersion() {
     $coll = @()
     $global:servers |% {
         $addr = $_.Address;
-        $root = (Get-Website "Default Web Site").PhysicalPath
+        $root = (Get-Website "Default Web Site").PhysicalPath.ToLower().Replace("%systemdrive%",$env:SystemDrive)
         $remoteRoot = MakeRemote $root
         $status = (Get-Content $remoteRoot)[1];
         $coll += @{"Server" = $addr; "Status" = $status}
@@ -1750,7 +1750,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.131 last modified 09-26-2018"
+    "SPPatchify version 0.132 last modified 09-27-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
