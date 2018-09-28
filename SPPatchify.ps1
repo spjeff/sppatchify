@@ -909,8 +909,9 @@ function ShowVersion() {
     $coll = @()
     $global:servers |% {
         $addr = $_.Address;
-        $root = "\\$addr\" + (Get-Website "Default Web Site").PhysicalPath.ToLower().Replace("%systemdrive%",$env:SystemDrive)
-        $remoteRoot = MakeRemote $root
+        $root = (Get-Website "Default Web Site").PhysicalPath.ToLower().Replace("%systemdrive%",$env:SystemDrive)
+        $remoteRoot = "\\$addr\"
+        $remoteRoot += MakeRemote $root
         $status = (Get-Content $remoteRoot)[1];
         $coll += @{"Server" = $addr; "Status" = $status}
     }
