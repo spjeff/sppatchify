@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.133
-    Last Modified	: 09-29-2018
+	Version			: 0.134
+    Last Modified	: 12-05-2018
     
 .LINK
 	Source Code
@@ -82,7 +82,10 @@ param (
     [string]$installAppOffline,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -uninstallAppOffline to DELETE app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
-    [string]$uninstallAppOffline
+    [string]$uninstallAppOffline,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -bypass to run with PACKAGE.BYPASS.DETECTION.CHECK=1')]
+    [swtich]$bypass
 )
 
 # Plugin
@@ -96,7 +99,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.133 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.134 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
@@ -229,6 +232,9 @@ function RunEXE() {
         $patchName = $name.replace(".exe", "")
         $cmd = "$root\media\$name"
         $params = "/passive /forcerestart /log:""$root\log\$name.log"""
+        if ($bypass) {
+            $params += " PACKAGE.BYPASS.DETECTION.CHECK=1"
+        }
         $taskName = "SPPatchify"
 
         # Loop - Run Task Scheduler
@@ -325,6 +331,19 @@ function WaitEXE($patchName) {
                 displayStatus $coll $false $false $msp $stats
             }
             while ($proc)
+
+            # Check Schtask Exit Code
+			Start-Sleep 3
+			$task = Get-ScheduledTask -TaskName $taskName -CimSession $addr
+			$info = $task | Get-ScheduledTaskInfo
+			$exit = $info.LastTaskResult
+			if ($exit -eq 0) {
+				Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Green
+			} else {
+				Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Red
+			}
+			
+			# Event Log
             New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr -ErrorAction SilentlyContinue | Out-Null
             Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "DONE" -ComputerName $addr
         }
@@ -1755,7 +1774,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.133 last modified 09-29-2018"
+    "SPPatchify version 0.134 last modified 12-05-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
