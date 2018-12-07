@@ -297,7 +297,7 @@ function WaitEXE($patchName) {
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
                 # $priorityhash = @{-2="Idle";-1="BelowNormal";0="Normal";1="AboveNormal";2="High";3="RealTime"} 
-                $cmd = "{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""High"") {`$proc.PriorityClass = ""High""}}"
+                $cmd = "`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass.ToString() -ne ""High"") {`$proc.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::HIGH}"
                 $sb = [Scriptblock]::Create($cmd)
                 Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
@@ -1124,12 +1124,14 @@ function GetMonth($mo) {
 
 function GetMonthInt($name) {
     # Convert three letter month name to integer
+    $found = $false
     1 .. 12 | ForEach-Object {
         if ($name -eq (Get-Culture).DateTimeFormat.GetAbbreviatedMonthName($_)) {
+            $found = $true
             return $_
         }
     }
-    return $name
+    if (!$found) {return $name}
 }
 function PatchRemoval() {
     # Remove patch media
@@ -1199,6 +1201,7 @@ function PatchMenu() {
     Write-Host "SELECTED = $($global:selmonth)" -Fore "Yellow"
     $year = $global:selmonth.Split(" ")[1]
     $month = GetMonthInt $global:selmonth.Split(" ")[0]
+    Write-Host "$year-$month-$sku$ver"
     $patchFiles = $csv |Where-Object {$_.Year -eq $year -and $_.Month -eq $month -and $_.Product -eq "$sku$ver"}
     $patchFiles | Format-Table -Auto
 	
@@ -1397,11 +1400,14 @@ function WaitSPTimer($addr, $service, $change, $state) {
     Write-Host -foregroundcolor DarkGray -NoNewLine "Waiting for $service to change to $change on server $addr"
 
     do {
+        # Display
         Start-Sleep 3
         Write-Host -Foregroundcolor DarkGray -NoNewLine "."
 
-        # Change
+        # Get Service
         $svc = Get-Service -ComputerName $addr -Name $timer
+
+        # Modify Service
         $svc | Set-Service -StartupType Automatic
         if ($state) {
             $svc | Start-Service
@@ -1409,7 +1415,6 @@ function WaitSPTimer($addr, $service, $change, $state) {
         else {
             $svc | Stop-Service
         }
-        
     }
     while ($svc.Status -ne $change)
     Write-Host -Foregroundcolor DarkGray -NoNewLine " Service is "
@@ -1489,7 +1494,7 @@ function VerifyWMIUptime() {
     foreach ($r in $result) {
         $TotalMinutes = [int]$r.TotalMinutes
         if ($TotalMinutes -gt $maxrebootminutes) {
-            Write-Host "WARNING - Last reboot was $TotalMinutes minutes ago for $($t.PSComputerName)" -Fore Black -Backgroundcolor Yellow
+            Write-Host "WARNING - Last reboot was $TotalMinutes minutes ago for $($r.PSComputerName)" -Fore Black -Backgroundcolor Yellow
             $warn++
         }
     }
