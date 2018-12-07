@@ -4,14 +4,14 @@
 .DESCRIPTION
 	Apply CU patch to entire farm from one PowerShell console.
 
-	NOTE - must run local to a SharePoint server under account with farm admin rights.
+    NOTE - must run local to a SharePoint server under account with farm admin rights.
 
 	Comments and suggestions always welcome!  spjeff@spjeff.com or @spjeff
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.134
-    Last Modified	: 12-05-2018
+	Version			: 0.136
+    Last Modified	: 12-07-2018
     
 .LINK
 	Source Code
@@ -40,7 +40,7 @@ param (
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseOneBinary to execute Phase One only (run binary)')]
     [switch]$phaseOneBinary,
 	
-	[Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -quick to run ONLY EXE binary')]
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -quick to run ONLY EXE binary')]
     [switch]$quick,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -phaseTwo to execute Phase Two after local reboot.')]
@@ -60,10 +60,10 @@ param (
     [switch]$remoteSessionSSL,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -test to open Remote PS Session and verify connectivity all farm members.')]
-    [switch]$testRemotePowershell,
+    [switch]$testRemotePS,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -skipProductLocal to run Phase One binary without Get-SPProduct -Local.')]
-    [switch]$skipProductLocal=$false,
+    [switch]$skipProductLocal = $false,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -targetServers to run for specific machines only.  Applicable to PhaseOne and PhaseTwo.')]
     [string[]]$targetServers,
@@ -85,7 +85,7 @@ param (
     [string]$uninstallAppOffline,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -bypass to run with PACKAGE.BYPASS.DETECTION.CHECK=1')]
-    [swtich]$bypass
+    [switch]$bypass
 )
 
 # Plugin
@@ -99,10 +99,12 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.134 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.136 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$stages = @("CopyEXE", "StopSvc", "RunEXE", "StartSvc", "ConfigWiz")
+$maxattempt = 3
+$maxrebootminutes = 120
+$logFolder = "$root\log"
 
 #region binary EXE
 function MakeRemote($path) {
@@ -133,8 +135,6 @@ function CopyEXE($action) {
 
     # Watch Jobs
     Start-Sleep 5
-    $coll = newStatus("CopyEXE")
-    $coll | Format-Table -AutoSize
 
     $counter = 0
     do {
@@ -147,20 +147,8 @@ function CopyEXE($action) {
                 }
             }
 
-            # GUI In Progress
-            ($coll |Where-Object {$_.Server -eq $server.Address}).CopyEXE = 1
-            displayStatus $coll
-
             # Check Job Status
-            foreach ($job in Get-Job) {
-                Get-Job | Format-Table -AutoSize
-                if ($job.State -ne "Running") {
-                    # GUI Done
-                    $addr = $job.Command.Split(";")[0].Replace("#", "")
-                    ($coll | Where-Object {$_.Server -eq $addr}).CopyEXE = 2
-                    displayStatus $coll
-                }
-            }
+            Get-Job | Format-Table -AutoSize
         }
         Start-Sleep 5
         $pending = Get-Job |Where-Object {$_.State -eq "Running" -or $_.State -eq "NotStarted"}
@@ -170,8 +158,6 @@ function CopyEXE($action) {
 
     # Complete
     Get-Job | Format-Table -a
-    $coll | ForEach-Object {$_.CopyEXE = 2}
-    displayStatus $coll
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
 
@@ -214,11 +200,9 @@ function SafetyEXE() {
 
 function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
-    $coll = newStatus("RunEXE")
-    displayStatus $coll
 
     # Remove MSPLOG
-    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$root\log\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
+    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$logfolder\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
 
     # Remove MSPLOG
     LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
@@ -303,6 +287,7 @@ function WaitEXE($patchName) {
             $counter++
 
             # Remote Posh
+            $attempt = 0
             Write-Host "`nEXE monitor started on $addr at $(Get-Date) " -NoNewLine
             do {
                 # Monitor EXE process
@@ -312,40 +297,51 @@ function WaitEXE($patchName) {
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
                 # $priorityhash = @{-2="Idle";-1="BelowNormal";0="Normal";1="AboveNormal";2="High";3="RealTime"} 
-                $cmd ="{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""High"") {`$proc.PriorityClass = ""High""}}"
+                $cmd = "{`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass -ne ""High"") {`$proc.PriorityClass = ""High""}}"
                 $sb = [Scriptblock]::Create($cmd)
                 Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
                 # Measure EXE
-                $stats = $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
+                $proc | Select-Object Id, HandleCount, WorkingSet, PrivateMemorySize
 
                 # Count MSPLOG files
-                $cmd = "`$f=Get-ChildItem ""$root\log\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
+                $cmd = "`$f=Get-ChildItem ""$logFolder\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
                 $sb = [Scriptblock]::Create($cmd)
                 $result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-                $msp = $result | Select-Object Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | Sort-Object LastWriteTime, Server -Desc
-
-                # HTML view
-                $coll = newStatus("RunEXE")
-                ($coll |Where-Object {$_.Server -eq $addr}).RunEXE = 1
-                displayStatus $coll $false $false $msp $stats
+                $result | Select-Object Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | Sort-Object LastWriteTime, Server -Desc
             }
             while ($proc)
-
-            # Check Schtask Exit Code
-			Start-Sleep 3
-			$task = Get-ScheduledTask -TaskName $taskName -CimSession $addr
-			$info = $task | Get-ScheduledTaskInfo
-			$exit = $info.LastTaskResult
-			if ($exit -eq 0) {
-				Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Green
-			} else {
-				Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Red
-			}
 			
-			# Event Log
+            # Check Schtask Exit Code
+            Start-Sleep 3
+            $task = Get-ScheduledTask -TaskName $taskName -CimSession $addr
+            $info = $task | Get-ScheduledTaskInfo
+            $exit = $info.LastTaskResult
+            if ($exit -eq 0) {
+                Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Green
+            }
+            else {
+                Write-Host "EXIT CODE $exit - $taskName" -Fore White -Backgroundcolor Red
+            }
+			
+            # Event Log
             New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr -ErrorAction SilentlyContinue | Out-Null
-            Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "DONE" -ComputerName $addr
+            Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "DONE - Exit Code $exit" -ComputerName $addr
+
+            # Retry Attempt
+            if ($exit -gt 0) {
+                # Retry
+                $attempt++
+                if ($attempt -lt $maxattempt) {
+                    # Event log START
+                    New-EventLog -LogName "Application" -Source "SPPatchify" -ComputerName $addr -ErrorAction SilentlyContinue | Out-Null
+                    Write-EventLog -LogName "Application" -Source "SPPatchify" -EntryType Information -Category 1000 -EventId 1000 -Message "RETRY ATTEMPT # $attempt" -ComputerName $addr
+
+                    # Run
+                    Write-Host "RETRY ATTEMPT  # $attempt of $maxattempt" -Fore White -Backgroundcolor Red
+                    Start-ScheduledTask -TaskName $taskName -CimSession $addr
+                }
+            }
         }
     }
 }
@@ -358,7 +354,7 @@ function WaitReboot() {
     Start-Sleep 60
 	
     # Clean up
-    Get-PSSession | Remove-PSSession
+    Get-PSSession | Remove-PSSession -Confirm:$false
 	
     # Verify machines online
     $counter = 0
@@ -399,7 +395,7 @@ function WaitReboot() {
     }
 	
     # Clean up
-    Get-PSSession | Remove-PSSession
+    Get-PSSession | Remove-PSSession -Confirm:$false
 }
 
 function LocalReboot() {
@@ -447,19 +443,8 @@ function CalcDuration() {
 }
 function FinalCleanUp() {
     # Close sessions
-    Get-PSSession | Remove-PSSession
-
-    # Loop - Run Task Scheduler
-    foreach ($server in $global:servers) {
-        $addr = $server.Address
-        $found = Get-ScheduledTask -TaskName "SPPatchify" -ErrorAction SilentlyContinue -CimSession $addr
-        if ($found) {
-            $found | Unregister-ScheduledTask -Confirm:$false -CimSession $addr
-        }
-    }
-    Remove-Item "$root\sppatchify-status.html" -Confirm:$false -Force -ErrorAction SilentlyContinue | Out-Null
+    Get-PSSession | Remove-PSSession -Confirm:$false
     Stop-Transcript
-    CloseIE
 }
 #endregion
 
@@ -470,14 +455,8 @@ function LoopRemotePatch($msg, $cmd, $params) {
     }
 
     # Clean up
-    Get-PSSession | Remove-PSSession
-	
-    # GUI
-    $stage = "RunEXE"
-    if ($stage) {
-        $coll = newStatus($stage)
-    }
-	
+    Get-PSSession | Remove-PSSession -Confirm:$false
+
     # Loop servers
     $counter = 0
     foreach ($server in $global:servers) {
@@ -502,12 +481,6 @@ function LoopRemotePatch($msg, $cmd, $params) {
             Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
         }
         $counter++
-		
-        # GUI - In Progress
-        if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $addr})."$stage" = 1
-            displayStatus $coll
-        }
 		
         # Remote Posh
         Write-Host ">> invoke on $addr" -Fore "Green"
@@ -535,12 +508,6 @@ function LoopRemotePatch($msg, $cmd, $params) {
             }
         }
         Write-Host "<< complete on $addr" -Fore "Green"
-		
-        # GUI - Done
-        if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $addr})."$stage" = 2
-            displayStatus $coll
-        }
     }
     Write-Progress -Activity "Completed $(Get-Date)" -Completed	
 }
@@ -550,30 +517,7 @@ function LoopRemoteCmd($msg, $cmd) {
     }
 
     # Clean up
-    Get-PSSession | Remove-PSSession
-	
-    # GUI
-    switch -wildcard ($msg) {
-        "STOP services on*" {
-            $stage = "StopSvc"
-            break;
-        }
-        "START services on*" {
-            $stage = "StartSvc"
-            break;
-        }
-        "Run EXE on*" {
-            $stage = "RunEXE"
-            break;
-        }
-        "Run Config Wizard on*" {
-            $stage = "ConfigWiz"
-            break;
-        }
-    }
-    if ($stage) {
-        $coll = newStatus($stage)
-    }
+    Get-PSSession | Remove-PSSession -Confirm:$false
 	
     # Loop servers
     $counter = 0
@@ -595,13 +539,7 @@ function LoopRemoteCmd($msg, $cmd) {
             Write-Progress -Activity $msg -Status "$addr ($prct %) $(Get-Date)" -PercentComplete $prct
         }
         $counter++
-		
-        # GUI - In Progress
-        if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 1
-            displayStatus $coll
-        }
-		
+
         # Remote Posh
         Write-Host ">> invoke on $addr" -Fore "Green"
         
@@ -636,12 +574,6 @@ function LoopRemoteCmd($msg, $cmd) {
             Invoke-Command -Session $remote -ScriptBlock $mergeSb
         }
         Write-Host "<< complete on $addr" -Fore "Green"
-
-        # GUI - Done
-        if ($stage) {
-            ($coll |Where-Object {$_.Server -eq $server.Address})."$stage" = 2
-            displayStatus $coll
-        }
     }
     Write-Progress -Activity "Completed $(Get-Date)" -Completed
 }
@@ -709,7 +641,7 @@ function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("IISADMIN", "W3SVC", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights","DocAve 6 Agent Service") | ForEach-Object {
+            @("IISADMIN", "W3SVC", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
@@ -775,7 +707,7 @@ function ChangeContent($state) {
         # Remove content
         $dbs = Get-SPContentDatabase
         if ($dbs) {
-            $dbs | ForEach-Object {$wa = $_.WebApplication.Url; $_ | Select-Object Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$root\log\contentdbs-$when.csv" -NoTypeInformation
+            $dbs | ForEach-Object {$wa = $_.WebApplication.Url; $_ | Select-Object Name, NormalizedDataSource, @{n = "WebApp"; e = {$wa}}} | Export-Csv "$logFolder\contentdbs-$when.csv" -NoTypeInformation
             $dbs | ForEach-Object {
                 "$($_.Name),$($_.NormalizedDataSource)"
                 Dismount-SPContentDatabase $_ -Confirm:$false
@@ -784,7 +716,7 @@ function ChangeContent($state) {
     }
     else {
         # Add content
-        $files = Get-ChildItem "$root\log\contentdbs-*.csv" | Sort-Object LastAccessTime -Desc
+        $files = Get-ChildItem "$logFolder\contentdbs-*.csv" | Sort-Object LastAccessTime -Desc
         if ($files -is [Array]) {
             $files = $files[0]
         }
@@ -838,7 +770,7 @@ function ReadIISPW {
     $user = $env:username
     Write-Host "Logged in as $domain\$user"
 	
-    # Start IISAdmin if needed
+    # Start IISAdm` if needed
     $iisadmin = Get-Service IISADMIN
     if ($iisadmin.Status -ne "Running") {
         # Set Automatic and Start
@@ -885,8 +817,6 @@ function ReadIISPW {
     }
 
     # Save global
-    $global:username = $user
-    $global:userpass = $pass
     $global:cred = New-Object System.Management.Automation.PSCredential -ArgumentList "$domain\$user", $sec
 }
 
@@ -926,33 +856,34 @@ function ShowVersion() {
     # IIS UP/DOWN Load Balancer
     Write-Host "IIS UP/DOWN Load Balancer"
     $coll = @()
-    $global:servers |% {
+    $global:servers | ForEach-Object {
         try {
             $addr = $_.Address;
-            $root = (Get-Website "Default Web Site").PhysicalPath.ToLower().Replace("%systemdrive%",$env:SystemDrive)
+            $root = (Get-Website "Default Web Site").PhysicalPath.ToLower().Replace("%systemdrive%", $env:SystemDrive)
             $remoteRoot = "\\$addr\"
             $remoteRoot += MakeRemote $root
-            $status = (Get-Content "$remoteRoot\status.html")[1];
+            $status = (Get-Content "$remoteRoot\status.html" -ErrorAction SilentlyContinue)[1];
             $coll += @{"Server" = $addr; "Status" = $status}
-        } catch {
+        }
+        catch {
             # Suppress any error
         }
     }
-    $coll | ft -a
+    $coll | Format-Table -AutoSize
 
     # Database table
-	$d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
-    $d | Sort-Object NeedsUpgrade,Name | Select-Object NeedsUpgrade,Name | Format-Table -AutoSize
+    $d = Get-SPWebapplication -IncludeCentralAdministration | Get-SPContentDatabase 
+    $d | Sort-Object NeedsUpgrade, Name | Select-Object NeedsUpgrade, Name | Format-Table -AutoSize
 
-	# Database summary
-	$d | Group-Object NeedsUpgrade | Format-Table -AutoSize
+    # Database summary
+    $d | Group-Object NeedsUpgrade | Format-Table -AutoSize
     "---"
 	
-	# Server status table
-    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus,Servername | Sort-Object Name | Format-Table -AutoSize
+    # Server status table
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus, Servername | Sort-Object Name | Format-Table -AutoSize
 	
-	# Server status summary
-	(Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus | Sort-Object Name | Format-Table -AutoSize
+    # Server status summary
+    (Get-SPProduct).Servers | Select-Object Servername, InstallStatus -Unique | Group-Object InstallStatus | Sort-Object Name | Format-Table -AutoSize
 
     # Display data
     if ($maxv -eq $f.BuildVersion) {
@@ -1017,12 +948,9 @@ function UpgradeContent() {
     }
     $track | Format-Table -Auto
 	
-    # GUI - servers done
-    $coll = newStatus("done")
-    displayStatus $coll
 
     # Clean up
-    Get-PSSession | Remove-PSSession
+    Get-PSSession | Remove-PSSession -Confirm:$false
     Get-Job | Remove-Job
 	
     # Open sessions
@@ -1031,16 +959,16 @@ function UpgradeContent() {
         
         # Dynamic open PSSesion
         if ($remoteSessionPort -and $remoteSessionSSL) {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
+            New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL | Out-Null
         }
         elseif ($remoteSessionPort) {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort
+            New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort | Out-Null
         }
         elseif ($remoteSessionSSL) {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL
+            New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -UseSSL | Out-Null
         }
         else {
-            $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp
+            New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp | Out-Null
         }
     }
 
@@ -1129,11 +1057,6 @@ function UpgradeContent() {
                     Write-Progress -Activity "Upgrade database" -Status "$name ($prct %) $(Get-Date)" -PercentComplete $prct
                 }
                 $track | Format-Table -AutoSize
-				
-                # GUI
-                $msg = "Upgrading Content DB: $name ($prct %) - $counter of $($track.Count)"
-                displayStatus $coll ($prct * 3) $msg
-                Start-Sleep 3
             }
         }
 
@@ -1147,10 +1070,9 @@ function UpgradeContent() {
 	
     # GUI
     $msg = "Upgrade Content DB Complete (100 %)"
-    displayStatus $coll (100 * 3) $msg
 	
     # Clean up
-    Get-PSSession | Remove-PSSession
+    Get-PSSession | Remove-PSSession -Confirm:$false
     Get-Job | Remove-Job
 }
 
@@ -1207,6 +1129,7 @@ function GetMonthInt($name) {
             return $_
         }
     }
+    return $name
 }
 function PatchRemoval() {
     # Remove patch media
@@ -1345,12 +1268,12 @@ function DetectAdmin() {
 function SaveServiceInst() {
     # Save config to CSV
     $sos = Get-SPServiceInstance |Where-Object {$_.Status -eq "Online"} | Select-Object Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
-    $sos | Export-Csv "$root\log\sos-before.csv" -Force -NoTypeInformation
+    $sos | Export-Csv "$logFolder\sos-before.csv" -Force -NoTypeInformation
 }
 
 function StartServiceInst() {
     # Restore config from CSV
-    $sos = Import-Csv "$root\log\sos-before.csv"
+    $sos = Import-Csv "$logFolder\sos-before.csv"
     if ($sos) {
         foreach ($row in $sos) {
             $si = Get-SPServiceInstance $row.Id
@@ -1375,122 +1298,14 @@ function StartServiceInst() {
 }
 #endregion
 
-#region GUI status window
-function newStatus($currentStage) { 
-    # Servers (rows)
-    $coll = @()
-    foreach ($server in $global:servers) {
-        $row = New-Object -TypeName PSObject -Property @{Server = $server.Name; Role = $server.Role}
-        $coll += $row
-    }
-
-    # Stages (cols)
-    foreach ($row in $coll) {
-        $i = $stages.IndexOf($currentStage)
-        if ($currentStage -eq "done") {
-            $i = $stages.count
-        }
-        foreach ($s in $stages) {
-            if ($stages.IndexOf($s) -lt $i) {
-                $v = 2
-            }
-            else {
-                $v = 0
-            }
-            $row | Add-Member -MemberType NoteProperty -Name $s -Value $v
-        }
-    }
-    return $coll
-}
-
-function displayStatus($coll, $px, $msg, $msp, $stats) {
-    # Percent display
-    $c = 0
-    foreach ($row in $coll) {
-        foreach ($col in $stages) {
-            if ($row."$col" -eq 2) {
-                $c++
-            }
-        }
-    }
-    $rowCount = $coll.count
-    if (!$rowCount) {
-        $rowCount = 1
-    }
-    $total = $rowCount * $stages.count
-    $prct = [Math]::Round(($c / $total) * 100)
-	
-    # Progress bar
-    $foot = "<div style='text-align:right'>{0}</div>" -f (Get-Date)
-    if ($px) {
-        $foot += @"
-<br/>
-<b>{0}</b>
-<div style='width:300px;border:1px solid black'>
-<div style='width:{1}px;height:20px;background-color:blue;'></div>
-</div>
-"@ -f $msg, $px
-        $prct = $px / 3
-    }
-
-    # Generate HTML
-    $file = "$root\sppatchify-status.html"
-    $meta = "<meta http-equiv='refresh' content='5'><title>SPPatchify ($prct %)</title>"
-
-    # Measure EXE
-    if ($stats) {
-        $foot = ($stats | ConvertTo-Html -Fragment) + $foot
-    }
-	
-    # MSPLOG second table
-    if ($msp) {
-        $foot = ($msp | ConvertTo-Html -Fragment) + $foot
-    }
-
-    # HTML Footer and Color
-    $html = $coll | ConvertTo-Html -Head $meta -PostContent $foot
-    $html = $html.replace("<table", "<table border=0 cellpadding=6 cellspacing=0")
-    $html = $html.replace("<td>0</td>", "<td style='background-color:lightgray'>Not Started</td>")
-    $html = $html.replace("<td>1</td>", "<td style='background-color:yellow'>In Progress</td>")
-    $html = $html.replace("<td>2</td>", "<td style='background-color:lightgreen'>Complete</td>")
+function VerifyRemotePS() {
     try {
-        $html | Out-File $file -Force -Confirm:$false -ErrorAction SilentlyContinue
-    }
-    catch {}
-
-    launchIE $file
-}
-
-function LaunchIE($file) {
-    # Navigate Web browser
-    $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
-    if (!$ieproc) {
-        $global:ie = New-Object -COMObject InternetExplorer.Application
-        $global:ie.visible = $true
-        $global:ie.top = 200; $global:ie.width = 800; $global:ie.height = 500 ; $global:ie.Left = 100
-        $global:HWND = $global:ie.HWND
-    }
-    try {
-        $global:ie.navigate($file)
-    }
-    catch {
-    }
-}
-function CloseIE() {
-    # Close Web browser
-    $ieproc = (Get-Process -Name iexplore -ErrorAction SilentlyContinue)| Where-Object {$_.MainWindowHandle -eq $global:HWND}
-    $ieproc | Stop-Process
-}
-#endregion
-
-function PreflightCheck() {
-    try {
-        Write-Host "Check Remote PowerShell " -Fore Green
-        # Start Jobs
+        Write-Host "Test Remote PowerShell " -Fore Green
+        # Loop servers
         foreach ($server in $global:servers) {
             $addr = $server.Address
             if ($addr -ne $env:computername) {
-				            # Dynamic open PSSession
+                # Dynamic open PSSession
                 if ($remoteSessionPort -and $remoteSessionSSL) {
                     $remote = New-PSSession -ComputerName $addr -Credential $global:cred -Authentication Credssp -Port $remoteSessionPort -UseSSL
                 }
@@ -1509,24 +1324,23 @@ function PreflightCheck() {
         return $true
     }
     catch {
-        throw 'Not able to connect to one or more computers in the farm. Please make sure you have run run Enable-PSRemoting and Enable-WSManCredSSP -Role Server'
+        throw 'ERROR - Not able to connect to one or more computers in the farm. Please make sure you have run [Enable-PSRemoting] and [Enable-WSManCredSSP -Role Server]'
     }
 }
 
 function ClearCacheIni() {  
-
     Write-Host "Clear CACHE.INI " -Fore Green
 
     # Stop the SharePoint Timer Service on each server in the farm
-	Write-Host "Change SPTimer to OFF" -Fore Green
+    Write-Host "Change SPTimer to OFF" -Fore Green
     ChangeSPTimer $false
 
     # Delete all xml files from cache config folder on each server in the farm
-	Write-Host "Clear XML cache"
+    Write-Host "Clear XML cache"
     DeleteXmlCache
 
     # Start the SharePoint Timer Service on each server in the farm
-	Write-Host "Change SPTimer to ON" -Fore Red
+    Write-Host "Change SPTimer to ON" -Fore Red
     ChangeSPTimer $true
     Write-Host "Succeess" -Fore Green
 }
@@ -1631,9 +1445,9 @@ function DeleteXmlCache() {
     }
 }
 
-function TestRemotePowershell() {
+function TestRemotePS() {
     # Prepare
-    Get-PSSession | Remove-PSSession -ErrorAction SilentlyContinue | Out-Null
+    Get-PSSession | Remove-PSSession -Confirm:$false
     ReadIISPW
 
     # Connect
@@ -1661,6 +1475,47 @@ function TestRemotePowershell() {
     Write-Host "Sessions     : $((Get-PSSession).Count)" -Fore $color
 }
 
+function VerifyWMIUptime() {
+    # WMI Uptime
+    $sb = {
+        $wmi = Get-WmiObject -Class Win32_OperatingSystem;
+        $t = $wmi.ConvertToDateTime($wmi.LocalDateTime) – $wmi.ConvertToDateTime($wmi.LastBootUpTime);
+        $t;
+    }
+    $result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb 
+
+    # Compare threshold and suggest reboot
+    $warn = 0
+    foreach ($r in $result) {
+        $TotalMinutes = [int]$r.TotalMinutes
+        if ($TotalMinutes -gt $maxrebootminutes) {
+            Write-Host "WARNING - Last reboot was $TotalMinutes minutes ago for $($t.PSComputerName)" -Fore Black -Backgroundcolor Yellow
+            $warn++
+        }
+    }
+
+    # Suggest reboot
+    if ($warn) {
+        $prompt = $true
+        do {
+            # Prompt user
+            $Readhost = Read-Host "Do you want to reboot above servers?  (Y/N)" 
+            Switch ($ReadHost) { 
+                Y {
+                    $prompt = $false;
+
+                    # Reboot all
+                    Get-PSSession | ft -a
+                    Write-Host "Rebooting above servers ... "
+                    $sb = {Restart-Computer -Force}
+                    Invoke-Command -ScriptBlock $sb -Session (Get-PSSession)
+                } 
+                N {$prompt = $false} 
+            }
+        } while ($prompt)
+    }
+}
+
 function MountContentDatabases() {
     $csv = Import-Csv $mount
     foreach ($row in $csv) {
@@ -1674,7 +1529,7 @@ function MountContentDatabases() {
 function AppOffline ($state) {
     # Deploy App_Offline.ht to peer IIS instances across the farm
     $ao = "app_offline.htm"
-    $folders = Get-SPWebApplication |% {$_.IIsSettings[0].Path.FullName}
+    $folders = Get-SPWebApplication | % {$_.IIsSettings[0].Path.FullName}
     # Start Jobs
     foreach ($server in $global:servers) {
         $addr = $server.Address
@@ -1685,13 +1540,14 @@ function AppOffline ($state) {
                 if ($state) {
                     # Install by HTM file copy
                     # Dynamic command
-                    $dest = "\\$addr\$remoteRoot\app_offline.htm"
+                    $dest = "\\$addr\$remoteroot\app_offline.htm"
                     Write-Host "Copying $ao to $dest" -Fore Yellow
                     ROBOCOPY $ao $dest /Z /MIR /W:0 /R:0
-                } else {
+                }
+                else {
                     # Uinstall by HTM file delete
                     # Dynamic command
-                    $dest = "\\$addr\$remoteRoot\app_offline.htm"
+                    $dest = "\\$addr\$remoteroot\app_offline.htm"
                     Write-Host "Deleting $ao to $dest" -Fore Yellow
                     Remove-ChildItem $dest -Confirm:$false
                 }
@@ -1701,6 +1557,9 @@ function AppOffline ($state) {
 }
 
 function Main() {
+    # Clean up
+    Get-PSSession | Remove-PSSession -Confirm:$false
+
     # Local farm servers
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
     $remoteRoot = MakeRemote $root
@@ -1726,14 +1585,14 @@ function Main() {
 
     # Run SPPL to detect new binary patches
     if ($productlocal) {
-        TestRemotePowershell
+        TestRemotePS
         LoopRemoteCmd "Add-PSSnapIn Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue; Get-SPProduct -Local"
         Exit
     }
         
     # Test PowerShell
-    if ($testRemotePowershell) {
-        TestRemotePowershell
+    if ($testRemotePS) {
+        TestRemotePS
         Exit
     }
 
@@ -1769,12 +1628,12 @@ function Main() {
     # Start LOG
     $start = Get-Date
     $when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
-    $logFile = "$root\log\SPPatchify-$when.txt"
-    mkdir "$root\log" -ErrorAction SilentlyContinue | Out-Null
+    $logFile = "$logFolder\SPPatchify-$when.txt"
+    mkdir "$logFolder" -ErrorAction SilentlyContinue | Out-Null
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.134 last modified 12-05-2018"
+    "SPPatchify version 0.136 last modified 12-07-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
@@ -1791,13 +1650,18 @@ function Main() {
     }
     
     # Read IIS Password
-    ReadIISPW    
-    if (-not (PreflightCheck)) {
+    ReadIISPW
+
+    # Verify Remote PowerShell
+    if (-not (VerifyRemotePS)) {
         return
-    }    
+    }
+
+    # WMI Uptime
+    VerifyWMIUptime
 
     # Prepare \LOG\ folder
-    LoopRemoteCmd "Create log directory on" "mkdir '$root\log' -ErrorAction SilentlyContinue | Out-Null"
+    LoopRemoteCmd "Create log directory on" "mkdir '$logFolder' -ErrorAction SilentlyContinue | Out-Null"
 
     # Core steps
     if (!$phaseTwo -and !$phaseThree) {
@@ -1807,26 +1671,27 @@ function Main() {
         }
         else {
             # Phase One - Binary EXE.  Quick mode EXE only.
-			if ($quick) {
-				RunEXE
-				WaitReboot
-			} else {
-				PatchMenu
-				EnablePSRemoting
-				ClearCacheIni
-				CopyEXE "Copy"
-				SafetyEXE
-				SaveServiceInst
-				ChangeServices $true
-				if (!$skipProductLocal) {
-					ProductLocal
-				}
-				ChangeDC
-				ChangeServices $false
-				IISStart
-				RunEXE
-				WaitReboot
-			}
+            if ($quick) {
+                RunEXE
+                WaitReboot
+            }
+            else {
+                PatchMenu
+                EnablePSRemoting
+                ClearCacheIni
+                CopyEXE "Copy"
+                SafetyEXE
+                SaveServiceInst
+                ChangeServices $true
+                if (!$skipProductLocal) {
+                    ProductLocal
+                }
+                ChangeDC
+                ChangeServices $false
+                IISStart
+                RunEXE
+                WaitReboot
+            }
             if (!$skipProductLocal) {
                 ProductLocal
             }
