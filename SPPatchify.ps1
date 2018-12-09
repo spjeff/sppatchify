@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.136
-    Last Modified	: 12-07-2018
+	Version			: 0.140
+    Last Modified	: 12-09-2018
     
 .LINK
 	Source Code
@@ -99,7 +99,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.136 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.140 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $maxattempt = 3
@@ -1501,22 +1501,15 @@ function VerifyWMIUptime() {
 
     # Suggest reboot
     if ($warn) {
-        $prompt = $true
-        do {
-            # Prompt user
-            $Readhost = Read-Host "Do you want to reboot above servers?  (Type R, or Reboot)" 
-            Switch ($ReadHost) { 
-                R {
-                    $prompt = $false;
-
-                    # Reboot all
-                    Get-PSSession | ft -a
-                    Write-Host "Rebooting above servers ... "
-                    $sb = {Restart-Computer -Force}
-                    Invoke-Command -ScriptBlock $sb -Session (Get-PSSession)
-                } 
-            }
-        } while ($prompt)
+        # Prompt user
+        $Readhost = Read-Host "Do you want to reboot above servers?  [Type R to Reboot.  Anything else to continue.]" 
+        if ($ReadHost -like 'R*') { 
+            # Reboot all
+            Get-PSSession | Format-Table -Auto
+            Write-Host "Rebooting above servers ... "
+            $sb = {Restart-Computer -Force}
+            Invoke-Command -ScriptBlock $sb -Session (Get-PSSession)
+        }
     }
 }
 
@@ -1637,7 +1630,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.136 last modified 12-07-2018"
+    "SPPatchify version 0.140 last modified 12-09-2018"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
