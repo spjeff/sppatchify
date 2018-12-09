@@ -1504,9 +1504,9 @@ function VerifyWMIUptime() {
         $prompt = $true
         do {
             # Prompt user
-            $Readhost = Read-Host "Do you want to reboot above servers?  (Y/N)" 
+            $Readhost = Read-Host "Do you want to reboot above servers?  (Type R, or Reboot)" 
             Switch ($ReadHost) { 
-                Y {
+                R {
                     $prompt = $false;
 
                     # Reboot all
@@ -1515,7 +1515,6 @@ function VerifyWMIUptime() {
                     $sb = {Restart-Computer -Force}
                     Invoke-Command -ScriptBlock $sb -Session (Get-PSSession)
                 } 
-                N {$prompt = $false} 
             }
         } while ($prompt)
     }
