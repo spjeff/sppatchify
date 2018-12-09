@@ -202,7 +202,7 @@ function RunEXE() {
     Write-Host "===== RunEXE ===== $(Get-Date)" -Fore "Yellow"
 
     # Remove MSPLOG
-    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$logfolder\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
+    LoopRemoteCmd "Remove MSPLOG on " "Remove-Item '$logfolder\msp\*MSPLOG*' -Confirm:`$false -ErrorAction SilentlyContinue"
 
     # Remove MSPLOG
     LoopRemoteCmd "Unblock EXE on " "gci '$root\media\*' | Unblock-File -Confirm:`$false -ErrorAction SilentlyContinue"
@@ -215,7 +215,7 @@ function RunEXE() {
         Write-Host $name -Fore Yellow
         $patchName = $name.replace(".exe", "")
         $cmd = "$root\media\$name"
-        $params = "/passive /forcerestart /log:""$root\log\$name.log"""
+        $params = "/passive /forcerestart /log:""$root\log\msp\$name.log"""
         if ($bypass) {
             $params += " PACKAGE.BYPASS.DETECTION.CHECK=1"
         }
@@ -1627,6 +1627,7 @@ function Main() {
     $when = $start.ToString("yyyy-MM-dd-hh-mm-ss")
     $logFile = "$logFolder\SPPatchify-$when.txt"
     mkdir "$logFolder" -ErrorAction SilentlyContinue | Out-Null
+    mkdir "$logFolder\msp" -ErrorAction SilentlyContinue | Out-Null
     Start-Transcript $logFile
 
     # Version
