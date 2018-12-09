@@ -308,9 +308,11 @@ function WaitEXE($patchName) {
                 $cmd = "`$f=Get-ChildItem ""$logFolder\*MSPLOG*"";`$c=`$f.count;`$l=(`$f|sort last -desc|select -first 1).LastWriteTime;`$s=`$env:computername;New-Object -TypeName PSObject -Prop (@{""Server""=`$s;""Count""=`$c;""LastWriteTime""=`$l})"
                 $sb = [Scriptblock]::Create($cmd)
                 $result = Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
-                $result | Select-Object Server, @{n = "MSPCount"; e = {$_.Count}}, LastWriteTime | Sort-Object LastWriteTime, Server -Desc
+                $progress = "Server: $($result.Server)  /  MSP Count: $($result.Count)  /  Last Write: $($result.LastWriteTime)"
+                Write-Progress $progress
             }
             while ($proc)
+            Write-Host $progress
 			
             # Check Schtask Exit Code
             Start-Sleep 3
@@ -1526,7 +1528,7 @@ function MountContentDatabases() {
 function AppOffline ($state) {
     # Deploy App_Offline.ht to peer IIS instances across the farm
     $ao = "app_offline.htm"
-    $folders = Get-SPWebApplication | % {$_.IIsSettings[0].Path.FullName}
+    $folders = Get-SPWebApplication | ForEach-Object {$_.IIsSettings[0].Path.FullName}
     # Start Jobs
     foreach ($server in $global:servers) {
         $addr = $server.Address
