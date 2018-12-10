@@ -296,8 +296,7 @@ function WaitEXE($patchName) {
                 Start-Sleep 10
 
                 # Priority (High) from https://gallery.technet.microsoft.com/scriptcenter/Set-the-process-priority-9826a55f
-                # $priorityhash = @{-2="Idle";-1="BelowNormal";0="Normal";1="AboveNormal";2="High";3="RealTime"} 
-                $cmd = "`$proc = Get-Process -Name ""$patchName""; if (`$proc.PriorityClass.ToString() -ne ""High"") {`$proc.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::HIGH}"
+                $cmd = "`$proc = Get-Process -Name ""$patchName"" -ErrorAction SilentlyContinue; if (`$proc) { if (`$proc.PriorityClass.ToString() -ne ""High"") {`$proc.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::HIGH}}"
                 $sb = [Scriptblock]::Create($cmd)
                 Invoke-Command -Session (Get-PSSession) -ScriptBlock $sb
 
