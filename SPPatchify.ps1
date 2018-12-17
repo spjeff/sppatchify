@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.140
-    Last Modified	: 12-09-2018
+	Version			: 0.141
+    Last Modified	: 12-17-2018
     
 .LINK
 	Source Code
@@ -1661,6 +1661,7 @@ function Main() {
 
     # Prepare \LOG\ folder
     LoopRemoteCmd "Create log directory on" "mkdir '$logFolder' -ErrorAction SilentlyContinue | Out-Null"
+    LoopRemoteCmd "Create log directory on" "mkdir '$logFolder\msp' -ErrorAction SilentlyContinue | Out-Null"
 
     # Core steps
     if (!$phaseTwo -and !$phaseThree) {
