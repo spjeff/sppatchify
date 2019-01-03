@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.141
-    Last Modified	: 12-17-2018
+	Version			: 0.142
+    Last Modified	: 12-18-2018
     
 .LINK
 	Source Code
@@ -68,24 +68,20 @@ param (
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -targetServers to run for specific machines only.  Applicable to PhaseOne and PhaseTwo.')]
     [string[]]$targetServers,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -w -wave to scope to Odd/Even servers only. -wave 0 (Even) -wave 1 (Odd).  Will sort servers alphabetically by name and take Odd/Even rows for processing.')]
-    [Alias("w")]
-    [int]$wave,
-
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -productlocal to execute remote cmdlet [Get-SPProduct -Local] on all servers in farm, or target/wave servers only if given.')]
     [switch]$productlocal,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -mount to execute Mount-SPContentDatabase to load CSV and attach content databases to web applications.')]
     [string]$mount,
 
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -installAppOffline to COPY app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
-    [string]$installAppOffline,
-
-    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -uninstallAppOffline to DELETE app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
-    [string]$uninstallAppOffline,
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -appOffline TRUE/FALSE to COPY app_offline.htm] file to all servers and all IIS websites (except Default Website).')]
+    [string]$appOffline,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -bypass to run with PACKAGE.BYPASS.DETECTION.CHECK=1')]
-    [switch]$bypass
+    [switch]$bypass,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -changeServices TRUE/FALSE to toggle the farm active state UP/DOWN')]
+    [string]$changeServices
 )
 
 # Plugin
@@ -853,6 +849,9 @@ function ShowVersion() {
             $maxv = $v
         }
     }
+
+    # Control Panel Add/Remove Programs
+    
 	
     # IIS UP/DOWN Load Balancer
     Write-Host "IIS UP/DOWN Load Balancer"
@@ -1562,19 +1561,6 @@ function Main() {
     $global:servers = Get-SPServer |Where-Object {$_.Role -ne "Invalid"} | Sort-Object Address
     $remoteRoot = MakeRemote $root
 
-    # Wave - Target servers
-    if ($wave) {
-        $coll = @()
-        $i = 0
-        foreach ($s in $global:servers) {
-            if ($i % 2 -eq $wave) {
-                $coll += $s
-            }
-            $i++
-        }
-        $global:servers = $coll
-    }
-
     # List - Target servers
     if ($targetServers) {
         $global:servers = Get-SPServer |Where-Object {$targetServers -contains $_.Name} | Sort-Object Address
@@ -1613,12 +1599,22 @@ function Main() {
         Exit
     }
 
+    # Change Services
+    if ($changeServices.ToUpper() -eq "TRUE") {
+        changeServices $true
+        Exit
+    }
+    if ($changeServices.ToUpper() -eq "FALSE") {
+        changeServices $false
+        Exit
+    }
+
     # Install App_Offline
-    if ($installAppOffline) {
+    if ($appOffline.ToUpper() -eq "TRUE") {
         AppOffline $true
         Exit
     }
-    if ($uninstallAppOffline) {
+    if ($appOffline.ToUpper() -eq "FALSE") {
         AppOffline $false
         Exit
     }
