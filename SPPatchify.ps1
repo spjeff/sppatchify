@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.142
-    Last Modified	: 12-18-2018
+	Version			: 0.143
+    Last Modified	: 02-10-2019
     
 .LINK
 	Source Code
@@ -81,7 +81,10 @@ param (
     [switch]$bypass,
 
     [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -changeServices TRUE/FALSE to toggle the farm active state UP/DOWN')]
-    [string]$changeServices
+    [string]$changeServices,
+
+    [Parameter(Mandatory = $False, ValueFromPipeline = $false, HelpMessage = 'Use -saveServiceInstance to snapshot CSV with current Service Instances running.')]
+    [switch]$saveServiceInstance
 )
 
 # Plugin
@@ -95,7 +98,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.140 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.143 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $maxattempt = 3
@@ -1271,12 +1274,13 @@ function DetectAdmin() {
 function SaveServiceInst() {
     # Save config to CSV
     $sos = Get-SPServiceInstance |Where-Object {$_.Status -eq "Online"} | Select-Object Id, TypeName, @{n = "Server"; e = {$_.Server.Address}}
-    $sos | Export-Csv "$logFolder\sos-before.csv" -Force -NoTypeInformation
+    $sos | Export-Csv "$logFolder\sos-before-$when.csv" -Force -NoTypeInformation
 }
 
 function StartServiceInst() {
     # Restore config from CSV
-    $sos = Import-Csv "$logFolder\sos-before.csv"
+    $files = Get-ChildItem "$logFolder\sos-before-*.csv" | Sort-Object LastWriteTime -Descending
+    $sos = Import-Csv $files[0].FullName
     if ($sos) {
         foreach ($row in $sos) {
             $si = Get-SPServiceInstance $row.Id
@@ -1567,6 +1571,12 @@ function Main() {
     }
     Write-Host "Servers Online: $($global:servers.Count)"
 
+    # Save Service Instance
+    if ($saveServiceInstance) {
+        SaveServiceInst
+        Exit
+    }
+
     # Run SPPL to detect new binary patches
     if ($productlocal) {
         TestRemotePS
@@ -1628,7 +1638,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.140 last modified 12-09-2018"
+    "SPPatchify version 0.143 last modified 02-10-2019"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
