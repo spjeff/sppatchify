@@ -1,4 +1,9 @@
 # This Script will install the CU Faster 
+# Keep This Script and Required Files in Same Folder.
+
+Add-PSSnapin *sharepoint* 
+
+# This Script will install the CU Faster 
 #Keep This Script and Required Files in Same Folder.
 
 ########################### 
