@@ -1,24 +1,24 @@
-# This Script will install the CU Faster 
+# This Script will install the CU Faster
 # Keep This Script and Required Files in Same Folder.
 
 Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue | Out-Null
 
-# This Script will install the CU Faster 
+# This Script will install the CU Faster
 #Keep This Script and Required Files in Same Folder.
 
-########################### 
-##Ensure Patch is Present## 
-########################### 
+###########################
+##Ensure Patch is Present##
+###########################
 $patchfile = Get-ChildItem | Where-Object { $_.Extension -eq ".exe" } 
-if (!$patchfile) { 
+if (!$patchfile) {
     Write-Host "Unable to retrieve the file.  Exiting Script" -ForegroundColor "Red"
-    Return 
+    Return
 }
 
-######################## 
-##Stop Search Services## 
-######################## 
-##Checking Search services## 
+########################
+##Stop Search Services##
+########################
+##Checking Search services##
 $srchctr = 1 
 $srch4srvctr = 1 
 $srch5srvctr = 1
