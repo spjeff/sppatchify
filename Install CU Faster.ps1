@@ -53,7 +53,7 @@ If (($srv4.status -eq "Running") -or ($srv5.status -eq "Running")) {
 Write-Host "Stopping Search Services if they are running" -ForegroundColor Yellow
 if ($srv4.status -eq "Running") { 
     $srch4srvctr = 2 
-    Set-Service -Name "OSearch$srv" -StartupType Disabled 
+    Set-Service -Name "OSearch$ver" -StartupType Disabled 
     $srv4.stop() 
 }
 
@@ -127,12 +127,12 @@ $srv2 = Get-Service "SPTimerV4"
 $srv2.start()
 $srv3 = Get-Service "IISADMIN"
 $srv3.start()
-$srv4 = Get-Service "OSearch$srv"
+$srv4 = Get-Service "OSearch$ver"
 $srv5 = Get-Service "SPSearchHostController"
 
 ###Ensuring Search Services were stopped by script before Starting" 
 if ($srch4srvctr -eq 2) {
-    set-service -Name "OSearch$srv" -StartupType Automatic
+    set-service -Name "OSearch$ver" -StartupType Automatic
     $srv4.start()
 }
 if ($srch5srvctr -eq 2) {
