@@ -1,4 +1,10 @@
 Year,Month,Product,URL
+2019,9,SP10,https://download.microsoft.com/download/5/5/5/5554dc20-b98d-479a-b514-dbe2b336a713/sts2016-kb4475590-fullfile-x64-glb.exe
+2019,9,SP11,https://download.microsoft.com/download/0/d/2/0d2bf30c-e521-46aa-904a-7ecd522b8d05/wssloc2016-kb4475594-fullfile-x64-glb.exe
+2019,8,SP12,https://download.microsoft.com/download/4/A/8/4A89B420-E88C-4A90-B915-642CEFB2E3EA/wssloc2016-kb4464553-fullfile-x64-glb.exe
+2019,8,SP13,https://download.microsoft.com/download/C/7/4/C748A41B-4D89-44AF-9E27-BC9758DF2FEF/sts2016-kb4475549-fullfile-x64-glb.exe
+2019,7,SP15,https://download.microsoft.com/download/1/D/B/1DB1DAF8-B3B6-49F5-8FEC-09F623B9D108/sts2016-kb4475520-fullfile-x64-glb.exe
+2019,6,SP16,https://download.microsoft.com/download/B/A/0/BA0C8DB5-144C-44CD-BB92-7DCCBD5BA869/sts2016-kb4464594-fullfile-x64-glb.exe
 2019,5,SP16,https://download.microsoft.com/download/8/2/6/8263BEEA-C581-468C-A60E-9495723A5407/sts2016-kb4464549-fullfile-x64-glb.exe
 2019,5,SP16,https://download.microsoft.com/download/0/D/E/0DEA1C2B-E3BD-4364-B3CA-03972312C695/wssloc2016-kb4461507-fullfile-x64-glb.exe
 2019,4,SP16,https://download.microsoft.com/download/0/6/F/06F49FE9-4873-4C57-A24C-32BB3989AD63/sts2016-kb4464510-fullfile-x64-glb.exe
