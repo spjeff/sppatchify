@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.143
-    Last Modified	: 02-10-2019
+	Version			: 0.144
+    Last Modified	: 10-04-2019
     
 .LINK
 	Source Code
@@ -1719,6 +1719,10 @@ function Main() {
             ProductLocal
         }
         RunConfigWizard
+        # Content Online
+        if (!$onlineContent) {
+            ChangeContent $true
+        }
         # Launch new window - Phase Three
         LaunchPhaseThree
     }
