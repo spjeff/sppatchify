@@ -725,7 +725,7 @@ function ChangeContent($state) {
         if ($files) {
             Write-Host "Content DB - Mount from CSV $($files.Fullname)" -Fore Yellow
             $dbs = @()
-            $dbs = Import-Csv $files.Fullname
+            $dbs += Import-Csv $files.Fullname
             $counter = 0
             if ($dbs) {
                 $dbs | Where-Object {
