@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.144
-    Last Modified	: 10-04-2019
+	Version			: 0.145
+    Last Modified	: 12-18-2019
     
 .LINK
 	Source Code
@@ -724,6 +724,7 @@ function ChangeContent($state) {
         # Loop databases
         if ($files) {
             Write-Host "Content DB - Mount from CSV $($files.Fullname)" -Fore Yellow
+            $dbs = @()
             $dbs = Import-Csv $files.Fullname
             $counter = 0
             if ($dbs) {
