@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.145
-    Last Modified	: 12-18-2019
+	Version			: 0.146
+    Last Modified	: 12-23-2019
     
 .LINK
 	Source Code
@@ -98,7 +98,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.143 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.146 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $maxattempt = 3
@@ -1352,11 +1352,6 @@ function ClearCacheIni() {
     ChangeSPTimer $true
     Write-Host "Succeess" -Fore Green
 }
-
-function LaunchPhaseThree() {
-    Start-Process "powershell.exe" -ArgumentList "$scriptFile -phaseThree"
-}
-
 
 # Stops the SharePoint Timer Service on each server in the SharePoint Farm.
 function ChangeSPTimer($state) {
