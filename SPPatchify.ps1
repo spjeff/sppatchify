@@ -10,8 +10,8 @@
 .NOTES
 	File Namespace	: SPPatchify.ps1
 	Author			: Jeff Jones - @spjeff
-	Version			: 0.146
-    Last Modified	: 12-23-2019
+	Version			: 0.150
+    Last Modified	: 01-03-2020
     
 .LINK
 	Source Code
@@ -98,7 +98,7 @@ if ($phaseTwo) {
 if ($phaseThree) {
     $phase = "-phaseThree"
 }
-$host.ui.RawUI.WindowTitle = "SPPatchify v0.146 $phase"
+$host.ui.RawUI.WindowTitle = "SPPatchify v0.150 $phase"
 $rootCmd = $MyInvocation.MyCommand.Definition
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $maxattempt = 3
@@ -979,7 +979,7 @@ function UpgradeContent() {
     # Monitor and Run loop
     do {
         # Get latest PID status
-        $active = $track |Where-Object {$_.Status -eq "InProgress"}
+        $active = @($track |Where-Object {$_.Status -eq "InProgress"})
         foreach ($db in $active) {
             # Monitor remote server job
             if ($db.JID) {
@@ -1001,7 +1001,7 @@ function UpgradeContent() {
         # Ensure workers are active
         foreach ($server in $global:servers) {
             # Count active workers per server
-            $active = $track |Where-Object {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address}
+            $active = @($track |Where-Object {$_.Status -eq "InProgress" -and $_.UpgradePC -eq $server.Address})
             if ($active.count -lt $maxWorkers) {
 			
                 # Choose next available DB
@@ -1634,7 +1634,7 @@ function Main() {
     Start-Transcript $logFile
 
     # Version
-    "SPPatchify version 0.143 last modified 02-10-2019"
+    "SPPatchify version 0.150 last modified 01-03-2020"
 	
     # Parameters
     $msg = "=== PARAMS === $(Get-Date)"
