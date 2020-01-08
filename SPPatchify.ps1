@@ -1052,7 +1052,6 @@ function UpgradeContent() {
                 }
 				
                 # Progress
-                $counter = ($track |Where-Object {$_.Status -eq "Completed"}).Count
                 $prct = 0
                 if ($track) {
                     $prct = [Math]::Round(($counter / $track.Count) * 100)
@@ -1065,7 +1064,7 @@ function UpgradeContent() {
         }
 
         # Latest counter
-        $remain = $track |Where-Object {$_.status -ne "Completed" -and $_.status -ne "Failed"}
+        $remain = @($track |Where-Object {$_.status -ne "Completed" -and $_.status -ne "Failed"})
     }
     while ($remain)
     Write-Host "===== Upgrade Content Databases DONE ===== $(Get-Date)"
