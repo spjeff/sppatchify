@@ -327,3 +327,10 @@ Year,Month,Product,URL
 2015,SP1,PROJ15,https://download.microsoft.com/download/9/6/6/966D7B78-77BF-44D7-B97D-C8592812BB73/projectserversp2013-kb2880553-fullfile-x64-en-us.exe
 2015,SP2,SP14,https://download.microsoft.com/download/9/B/F/9BFC169F-BEFD-4344-B1EC-24CCF34570C0/oserversp2010-kb2687453-fullfile-x64-en-us.exe
 2015,SP2,PROJ14,https://download.microsoft.com/download/7/0/4/7041CD79-7AD5-480B-8DC4-CAD2695C425A/svrprjsp2010-kb2687452-fullfile-x64-en-us.exe
+2020,1,SP16,https://download.microsoft.com/download/b/7/7/b7784c25-dc3a-477c-af43-ae59e01e90c3/wssloc2016-kb4484220-fullfile-x64-glb.exe
+2020,2,SP16,https://download.microsoft.com/download/6/5/5/655CE976-72C5-49E8-A8BF-38FE2C93192E/sts2016-kb3085363-fullfile-x64-glb.exe
+2020,2,SP16,https://download.microsoft.com/download/d/8/c/d8c43752-1e4a-4049-b93f-2d922859ff06/wssloc2016-kb4484257-fullfile-x64-glb.exe
+2020,3,SP16,https://download.microsoft.com/download/6/c/5/6c504679-edbf-42ec-be33-a32a6b0e82fd/sts2016-kb4484272-fullfile-x64-glb.exe
+2020,3,SP16,https://download.microsoft.com/download/4/e/2/4e2e357b-787c-408e-b174-410d20ccec2d/wssloc2016-kb4484275-fullfile-x64-glb.exe
+2020,4,SP16,https://download.microsoft.com/download/8/c/1/8c19f306-1981-46a4-8785-5935925566cd/sts2016-kb4484299-fullfile-x64-glb.exe
+2020,4,SP16,https://download.microsoft.com/download/2/1/1/2111aa4e-f394-401c-b542-9a7fa814b6c3/wssloc2016-kb4484301-fullfile-x64-glb.exe
