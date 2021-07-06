@@ -1179,7 +1179,7 @@ function PatchMenu() {
         $farm = Get-SPFarm -ErrorAction SilentlyContinue
         if ($farm) {
             $ver = $farm.BuildVersion.Major
-            $sppl = (Get-SPProduct -Local) |Where-Object {$_.ProductName -like "*Microsoft Project*"}
+            $sppl = (Get-SPProduct -Local) |Where-Object {($_.ProductName -like "*Microsoft Project*" -or $_.ProductName -like "*Microsoft® Project*")}
             if ($sppl) {
                 if ($ver -ne 16) {
                     $sku = "PROJ"
