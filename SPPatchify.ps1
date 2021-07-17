@@ -641,7 +641,7 @@ function ChangeServices($state) {
         $action = "STOP"
         $sb = {
             Start-Process 'iisreset.exe' -ArgumentList '/stop' -Wait -PassThru -NoNewWindow | Out-Null
-            @("IISADMIN", "W3SVC", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
+            @("IISADMIN", "SPAdminV4", "SPTimerV4", "SQLBrowser", "Schedule", "SPInsights", "DocAve 6 Agent Service") | ForEach-Object {
                 if (Get-Service $_ -ErrorAction SilentlyContinue) {
                     Set-Service -Name $_ -StartupType Disabled -ErrorAction SilentlyContinue
                     Stop-Service $_ -ErrorAction SilentlyContinue
