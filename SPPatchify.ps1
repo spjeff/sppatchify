@@ -656,7 +656,7 @@ function ChangeServices($state) {
     # Search Crawler
     Write-Host "$action search crawler ..."
     try {
-        $ssa = Get-SPEenterpriseSearchServiceApplication 
+        $ssa = Get-SPEnterpriseSearchServiceApplication 
         if ($state) {
             $ssa.resume()
         }
